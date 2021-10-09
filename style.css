@@ -1,3 +1,6 @@
+* {
+  box-sizing: border-box;
+}
 canvas {
   position: fixed;
   width: 100%;
@@ -16,4 +19,53 @@ canvas {
 
 #canvas-fg {
   pointer-events: none;
+}
+
+#query-input {
+  width: 200px;
+  border-radius: 5px;
+  outline: none;
+  border-style: none;
+  padding: 4px;
+}
+
+.input-cont {
+  position: fixed;
+  z-index: 1;
+  right: calc(50% - 100px);
+  top: 15px;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+.slider-label {
+  color:white;
+  font-size: 18px;
+  margin-right: 5px;
+}
+
+.slider {
+  font-size: 15px;
+  padding: 6px 20px;
+  margin: 4px 0px 0;
+  background-color: rgb(138, 138, 138);
+  flex-grow: 1;
+  border-radius: 5px;
+}
+.slider.x {
+  cursor: ew-resize;
+}
+.slider.y {
+  cursor: ns-resize;
+}
+.slider:hover {
+  background-color: coral;
+}
+
+.slider-cont {
+  display: flex;
+}
+
+.hidden {
+  display: none!important;
 }

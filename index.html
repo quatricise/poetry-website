@@ -12,7 +12,23 @@
   <canvas id="canvas-bg"></canvas>
   <canvas id="canvas-text" class="grab"></canvas>
   <canvas id="canvas-fg"></canvas>
-
+  <div class="input-cont" id="query-box">
+    <input type="text" id="query-input">
+    <div class="slider-cont">
+      <span class="slider-label">x:</span>
+      <span class="slider-label" id="real-x-value">0</span>
+      <div class="slider x" id="x-value-slider"></div>
+    </div>
+    <div class="slider-cont">
+      <span class="slider-label">y:</span>
+      <span class="slider-label" id="real-y-value">0</span>
+      <div class="slider y" id="y-value-slider"></div>
+    </div>
+    <div class="slider-cont">
+      
+      <span class="slider-label"><input type="checkbox" name="both-axis" id="both-axis-checkbox">Change both axis.</span>
+    </div>
+  </div>
 
   <script src="canvas.js"></script>
 </body>
