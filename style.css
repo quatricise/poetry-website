@@ -1,0 +1,19 @@
+canvas {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+#canvas-bg {
+  pointer-events: none;
+}
+#canvas-text {
+  
+}
+.grab {
+  cursor: grab;
+}
+
+#canvas-fg {
+  pointer-events: none;
+}
