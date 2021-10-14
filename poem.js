@@ -1,0 +1,105 @@
+function returnPoem() {
+  let poem = {
+    stanza1: [
+      {x: Math.round(cw/2) - 160, y: Math.round(ch/2) - 50},
+      `Deep in the shady sadness of a vale`,
+      `Far sunken from the healthy breath of morn,`,
+      `Far from the fiery noon, and eve's one star,`,
+      `Sat gray-hair'd Saturn, quiet as a stone,`,
+    ],
+    stanza2: [
+      {x: 1522, y: 1157},
+      `Still as the silence round about his lair;`,
+      `Forest on forest hung about his head`,
+    ],
+    stanza3: [
+      {x: 852, y: 1709},
+      `Like cloud on cloud. No stir of air was there,`,
+      `Not so much life as on a summer's day`,
+    ],
+    stanza4: [
+      {x: 1305, y: 2160},
+      `Robs not one light seed from the feather'd grass,`,
+      `But where the dead leaf fell, there did it rest.`,
+      `A stream went voiceless by, still deadened more`,
+      `By reason of his fallen divinity`,
+    ],
+    stanza5: [
+      {x: 2040, y: 2515},
+      `Spreading a shade: the Naiad 'mid her reeds`,
+      `Press'd her cold finger closer to her lips.`,
+    ],
+    stanza6: [
+      {x: 1410, y: 2978},
+      `Along the margin-sand large foot-marks went,`,
+      `No further than to where his feet had stray'd,`,
+      `And slept there since. Upon the sodden ground`,
+      `His old right hand lay nerveless, listless, dead,`,
+    ],
+    stanza7: [
+      {x: 700, y: 3509},
+      `Unsceptred; and his realmless eyes were closed;`,
+      `While his bow'd head seem'd list'ning to the Earth,`,
+      `His ancient mother, for some comfort yet.`,
+    ],
+    stanza8: [
+      {x: 1123, y: 4000},
+      `It seem'd no force could wake him from his place;`,
+      `But there came one, who with a kindred hand`,
+      `Touch'd his wide shoulders, after bending low`,
+      `With reverence, though to one who knew it not.`,
+    ],
+    stanza9: [
+      {x: 1420, y: 4709},
+      `She was a Goddess of the infant world;`,
+      `By her in stature the tall Amazon`,
+      `Had stood a pigmy's height; she would have ta'en`,
+      `Achilles by the hair and bent his neck;`,
+      `Or with a finger stay'd Ixion's wheel.`,
+    ],
+    stanza10: [
+      {x: 1754, y: 5297},
+      `Her face was large as that of Memphian sphinx,`,
+      `Pedestal'd haply in a palace court,`,
+      `When sages look'd to Egypt for their lore.`,
+    ],
+    stanza11: [
+      {x: 1410, y: 5812},
+      `But oh! how unlike marble was that face:`,
+      `How beautiful, if sorrow had not made`,
+      `Sorrow more beautiful than Beauty's self.`,
+    ],
+    stanza12: [
+      {x: 1123, y: 6000},
+      `There was a listening fear in her regard,`,
+      `As if calamity had but begun;`,
+      `As if the vanward clouds of evil days`,
+      `Had spent their malice, and the sullen rear`,
+      `Was with its stored thunder labouring up.`,
+    ],
+    stanza13: [
+      {x: 1123, y: 6500},
+      `One hand she press'd upon that aching spot`,
+      `Where beats the human heart, as if just there,`,
+      `Though an immortal, she felt cruel pain:`,
+    ],
+    stanza14: [
+      {x: 1123, y: 7000},
+      `The other upon Saturn's bended neck`,
+      `She laid, and to the level of his ear`,
+      `Leaning with parted lips, some words she spake`,
+      `In solemn tenour and deep organ tone:`,
+    ],
+    stanza15: [
+      {x: 0, y: 0},
+      ``,
+      ``,
+    ],
+    stanzaN: [
+      {x: 0, y: 0},
+      ``,
+      ``,
+    ],
+  }
+  return poem
+}

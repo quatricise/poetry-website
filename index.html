@@ -4,14 +4,17 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hyperion</title>
+  <title>Hyperion - Book I</title>
   <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css" integrity="sha512-NhSC1YmyruXifcj/KFRWoC561YpHpc5Jtzgvbuzx5VozKpWvQ+4nXhPdFgmx8xqexRcpAglTj9sIBWINXa8x5w==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <canvas id="canvas-bg"></canvas>
+  <canvas id="canvas-mg"></canvas>
+  <canvas id="canvas-mg2"></canvas>
   <canvas id="canvas-text" class="grab"></canvas>
   <canvas id="canvas-fg"></canvas>
+  <canvas id="canvas-fg2"></canvas>
   <div class="input-cont" id="query-box">
     <input type="text" id="query-input">
     <div class="slider-cont">
@@ -24,12 +27,24 @@
       <span class="slider-label" id="real-y-value">0</span>
       <div class="slider y" id="y-value-slider"></div>
     </div>
+    <div class="slider-cont hidden">
+      <span class="slider-label">Deg:</span>
+      <span class="slider-label" id="rotation-value">0</span>
+      <div class="slider rot" id="rotation-value-slider"></div>
+    </div>
     <div class="slider-cont">
-      
-      <span class="slider-label"><input type="checkbox" name="both-axis" id="both-axis-checkbox">Change both axis.</span>
+      <input type="checkbox" name="both-axis" id="both-axis-checkbox">
+      <label for="both-axis-checkbox" class="slider-label">Change both axis.</label>
+    </div>
+    <div class="slider-cont">
+      <div class="button" id="view-changes-btn">View changes</div>
     </div>
   </div>
 
+  <div class="changelog" id="changelog">
+    <h3 class="heading-small">Changed objects:</h3>
+  </div>
+  <script src="poem.js"></script>
   <script src="canvas.js"></script>
 </body>
 </html>
