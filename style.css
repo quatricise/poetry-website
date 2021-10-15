@@ -1,6 +1,11 @@
 * {
   box-sizing: border-box;
 }
+body {
+  padding: 0;
+  margin: 0;
+}
+
 canvas {
   position: fixed;
   width: 100%;
@@ -18,7 +23,7 @@ canvas {
 }
 
 .grab {
-  cursor: grab;
+  cursor: none;
 }
 
 #canvas-fg {
@@ -35,6 +40,7 @@ canvas {
   border-style: none;
   padding: 4px;
   margin-bottom: 4px;
+  background-color: rgb(235, 235, 235);
 }
 
 .input-cont {
@@ -100,9 +106,9 @@ input[type=checkbox] {
 .changelog {
   width: 300px;
   position: fixed;
-  left: 20px;
-  top: 15px;
-  background-color: white;
+  left: 5px;
+  top: 70px;
+  background-color: rgb(197, 197, 197);
   padding: 5px;
   border-radius: 3px;
 }
@@ -111,12 +117,12 @@ input[type=checkbox] {
   padding: 4px 0;
   border-style: solid;
   border-width: 0 0 2px 0;
-  border-color: rgb(236, 236, 236);
+  border-color: rgb(172, 172, 172);
 }
 
 .heading-small {
   padding: 0;
-  margin: 0 0 5px;
+  margin: 0 0 2px;
   font-family: Arial;
 
 }
@@ -124,7 +130,25 @@ input[type=checkbox] {
   background-color: rgb(168, 5, 5);
   color: white;
   margin-left: 15px;
-  padding: 2px;
+  padding: 3px 2px 2px;
   cursor: pointer;
   border-radius: 5px;
+  float: right;
+}
+
+.handle {
+  width: 28px;
+  height: 26px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform: rotate(90deg);
+  cursor: all-scroll;
+  user-select: none;
+  font-family: Arial;
+  font-size: 16px;
+}
+
+.changelog .header {
+  display: flex;
 }

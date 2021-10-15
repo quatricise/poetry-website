@@ -1,5 +1,6 @@
 let debug = false;
-let graphics = 'medium'
+let graphics = 'medium';
+let userInteracted = false;
 const PI = Math.PI
 
 let queryInput = document.querySelector('#query-input')
@@ -18,6 +19,10 @@ let selectedObject;
 let queryBox = document.querySelector('#query-box')
 
 let changelogContainer = document.querySelector('#changelog')
+let changelogHandle = document.querySelector('#handle')
+
+let movingChangelog = false;
+
 let viewChangesButton = document.querySelector('#view-changes-btn')
 viewChangesButton.addEventListener('click', function() {
   viewChanges()
@@ -64,47 +69,24 @@ let ch = window.innerHeight
 
 
 window.onresize = () => {
-  canvases.forEach(canvas => {
-    canvas.width = window.innerWidth
-    canvas.height = window.innerHeight
-  })
+  let prevCw = cw
+  let prevCh = ch
   cw = window.innerWidth
   ch = window.innerHeight
-}
 
-let poem = returnPoem();
+  canvases.forEach(canvas => {
+    canvas.width = cw
+    canvas.height = ch
+  })
+  // moveCanvas(undefined,{
+  //   x: prevCw - cw,
+  //   y: prevCh - ch,
+  // })
+  // moveCanvas(undefined,{
+  //   x: 0 - (cw - prevCw),
+  //   y: 0 - (ch - prevCh),
+  // })
 
-let assets = {
-  stanza1_gray_vale: {
-    src: 'assets/stanza1_gray_vale.png'
-  },
-  stanza8_bg_grass: {
-    src: 'assets/stanza8_bg_grass_linework_white.png'
-  },
-  stanza8_fg_grass: {
-    src: 'assets/stanza8_fg_grass_linework_white.png'
-  },
-  stanza8_waterfall: {
-    src: 'assets/stanza8_waterfall_linework_white.png'
-  },
-  small_ringed_planet: {
-    src: 'assets/small_ringed_planet.png'
-  },
-  small_moon_1: {
-    src: 'assets/small_moon_1.png'
-  },
-  small_asteroid_1: {
-    src: 'assets/small_asteroid_1.png'
-  },
-  small_asteroid_2: {
-    src: 'assets/small_asteroid_2.png'
-  },
-  small_asteroid_2_rot2: {
-    src: 'assets/small_asteroid_2_rot2.png'
-  },
-  small_cloud: {
-    src: 'assets/small_cloud.png'
-  },
 }
 
 //input related variables
@@ -222,12 +204,25 @@ document.addEventListener('mousemove', function(e) {
 
     }
   }
+
+  if(movingChangelog) {
+    changelogContainer.style.left = Math.max(Math.min(e.clientX - 12,cw - 300), 0) + 'px'
+    changelogContainer.style.top = Math.max(Math.min(e.clientY - 12,ch - 30), 0) + 'px'
+  }
+
   mouseNow = {
     x: e.clientX,
     y: e.clientY,
   }
 
 })
+
+changelogHandle.addEventListener('mousedown', function(e) {
+  mousedown = true
+  movingChangelog = true
+  console.log('mousedown on changelogHandle')
+},false)
+
 
 
 queryInput.addEventListener('keydown', function (e) {
@@ -267,12 +262,18 @@ sliderRot.addEventListener('mousedown', function(e) {
     y: e.clientY,
   }
 })
+let movingCanvas = false
 
 canvasText.addEventListener('mousedown', function (e) {
   mousedown = true
+  movingCanvas = true
   mouseNow = {
     x: e.clientX,
     y: e.clientY,
+  }
+  if(!userInteracted) {
+    userInteracted = true
+    initAudio()
   }
   
 },false)
@@ -282,20 +283,34 @@ document.addEventListener('mouseup', function (e) {
   changingXforSelected = false
   changingYforSelected = false
   changingRotforSelected = false
+  movingCanvas = false
+  movingChangelog = false
 },false)
 
 canvasText.addEventListener('mousemove', function (e) {
   if(!mousedown) return
-  moveCanvas(e)
+
+  if(movingCanvas) {
+    moveCanvas(e)
+  }
   mouseNow = {
     x: e.clientX,
     y: e.clientY,
   }
+
 },false)
 
-function moveCanvas(e) {
-  let dx = e.clientX - mouseNow.x
-  let dy = e.clientY - mouseNow.y
+function moveCanvas(e, offset) {
+  let dx;
+  let dy;
+  if(e) {
+    dx = e.clientX - mouseNow.x
+    dy = e.clientY - mouseNow.y
+  }
+  else if(offset) {
+    dx = offset.x
+    dy = offset.y
+  }
   dx *= dragMultiplier
   dy *= dragMultiplier
   bctx.translate(dx * bgTransMult,  dy * bgTransMult)
@@ -304,7 +319,7 @@ function moveCanvas(e) {
   tctx.translate(dx * tTransMult,   dy * tTransMult)
   fctx.translate(dx * fgTransMult,  dy * fgTransMult)
   f2ctx.translate(dx * fg2TransMult,  dy * fg2TransMult)
-
+  
   globalTranslate.x += dx
   globalTranslate.y += dy
 
@@ -343,7 +358,7 @@ function draw() {
   else {
     mouseTravel.x = mouseTravel.y = 0
   }
-
+  //update center of screen for tctx
   center.x = -globalTranslate.x + cw/2
   center.y = -globalTranslate.y + ch/2
     
@@ -355,17 +370,26 @@ function draw() {
   particles.forEach(particle=> {
     particle.update()
   })
+  mouseGlow.update()
+
+
+
+  //cleanup
+  particles.forEach((particle,index)=> {
+    if(particle.dead) particles.splice(index,1)
+  })
 
   // draw
 
   drawBg(bctx,bgTransMult)
   drawStars(bctx,bgTransMult)
 
-bctx.save()
-bctx.arc(center.x * bgTransMult + (cw/2)*(1- bgTransMult),center.y * bgTransMult + (ch/2)*(1- bgTransMult), 20,0,PI*2,false)
-bctx.fillStyle = 'red'
-bctx.fill()
-bctx.restore()
+  mouseGlow.draw()
+  
+//nasty code that calculates the visual center for each canvas
+// (center.x * bgTransMult + (cw/2)*(1- bgTransMult))
+// (center.y * bgTransMult + (ch/2)*(1- bgTransMult))
+
 
   if(debug) {
     // drawBgSquare()
@@ -446,7 +470,7 @@ function drawPoemTest(ctx) {
 }
 
 function clearCtx(ctx,mult) {
-  ctx.clearRect(-globalTranslate.x * mult,-globalTranslate.y * mult,window.innerWidth,window.innerHeight)
+  ctx.clearRect(-globalTranslate.x * mult,-globalTranslate.y * mult,cw,ch)
 }
 
 function outlineViewport(ctx,mult) {
@@ -682,8 +706,8 @@ class TextObject {
   draw() {
     this.ctx.save()
     let textdist = Math.hypot(this.x + 100 - center.x,this.y + 50 - center.y) //bodge , okay this is gonna be a classic bodge, the bodgiest of all, just hardcode an offset here, nice
-    let segment = 100/Math.min(cw,ch)
-    let alpha = 1 - segment*textdist/90 + segment/2
+    let segment = 80/Math.min(cw,ch)
+    let alpha = 1 - segment*textdist/100 + segment/2
     if(alpha > 0) {
       this.ctx.globalAlpha = alpha
     }
@@ -698,19 +722,19 @@ class TextObject {
     }
     if(debug) {
       this.ctx.fillText(`Text dist from center: ${textdist}`,this.x,this.y - lineHeight*2)
-      this.ctx.fillText(`Alpha value set to: ${1 - segment*textdist/90}`,this.x,this.y - lineHeight*3)
+      this.ctx.fillText(`Alpha value set to: ${1 - segment*textdist/100}`,this.x,this.y - lineHeight*3)
     }
     this.ctx.restore()
   }
 }
 
 class Img {
-  constructor(x,y,dimX,dimY,rotation = 0,src,ctx, mult, id = Math.floor(Math.random()*1_000_000_000)) {
+  constructor(x,y,dimX,dimY,rotation = 0,src,ctx, mult, id = Math.floor(Math.random()*1_000_000_000), maxOpacity = 1) {
     this.dimX = dimX
     this.dimY = dimY
     this.x = x
     this.y = y
-    this.rotation = rotation *PI/180 // provide this in deg, convert to radians here
+    this.rotation = rotation * PI/180 // provide this in deg, convert to radians here
     this.img = new Image()
     this.img.src = src
     this.ctx = ctx
@@ -721,10 +745,13 @@ class Img {
   }
   draw() {
     this.ctx.save()
-
-    let dist = Math.hypot(this.x + 100 - center.x,this.y + 50 - center.y) //bodge , okay this is gonna be a classic bodge, the bodgiest of all, just hardcode an offset here, nice
-    let segment = 100/Math.min(cw,ch)
-    let darken = 1 - segment*dist/100 + segment/2
+    let dist = Math.hypot(
+      this.x - (center.x * this.mult + (cw/2)*(1- this.mult)), //bodge , okay this is gonna be a classic bodge, the bodgiest of all, just hardcode an offset here, nice
+      this.y - (center.y * this.mult + (ch/2)*(1- this.mult))
+    )
+    let vignetteStrenght = 6
+    let segment = (100/vignetteStrenght)/Math.min(cw,ch) //bodge , the 0.8 x 4 is used to clamp the differences between cw and ch
+    let darken = 1 - segment*dist/(100/vignetteStrenght) + segment/2
     if(darken > 0) {
       this.ctx.filter = `brightness(${Math.min(0.5 + darken,1)})`
     }
@@ -744,21 +771,72 @@ class Img {
   }
 }
 
+class MouseGlow {
+  constructor(x,y,radius,ctx,mult) {
+    this.x = x
+    this.y = y
+    this.radiusInit = radius
+    this.radius = this.radiusInit
+    this.radiusRange = this.radius*0.15
+    this.ctx = ctx
+    this.mult = mult
+    this.img = new Image()
+    this.img.src = 'assets/mouse_glow.png'
+    this.pulseCycleMax = 180 // this oscillates between this number and -this number
+    this.pulseCycle = this.pulseCycleMax
+  }
+  draw() {
+    // let thing = this.x - this.radius/2 - center.x * this.mult + (cw/2)*(1- this.mult);
+    this.ctx.save()
+    this.ctx.drawImage(
+      this.img,
+      this.x - this.radius + (center.x * this.mult) - cw/2,
+      this.y - this.radius + (center.y * this.mult) - ch/2,
+      this.radius*2,
+      this.radius*2
+    )
+    this.ctx.restore()
+  }
+  update() {
+    this.x = mouseNow.x
+    this.y = mouseNow.y
+
+    if(Math.abs(this.pulseCycle) <= this.pulseCycleMax) {
+      this.pulseCycle++ 
+    }
+    else if(Math.abs(this.pulseCycle) > this.pulseCycleMax) {
+      this.pulseCycle = -this.pulseCycleMax
+    }
+
+    this.radius = this.radiusInit - this.radiusRange + this.radiusRange*( Math.abs(this.pulseCycle) / this.pulseCycleMax )
+  }
+}
+let mouseGlowProperties = {
+  radius: 350
+}
+let mouseGlow = new MouseGlow(0, 0,mouseGlowProperties.radius,tctx, tTransMult)
+
 let images = []
 
-images.push(new Img(900, 1000,800,800,0,assets['stanza1_gray_vale'].src,m2ctx,mg2TransMult, 'vale'))
-images.push(new Img(376, 561,150,150,0,assets['small_ringed_planet'].src,bctx,bgTransMult, 'saturn'))
-images.push(new Img(1660, 1597,700,700,0,assets['small_cloud'].src,m2ctx,mg2TransMult, 'cloud'))
-images.push(new Img(1698, 224,90,90,0,assets['small_asteroid_1'].src,fctx,fgTransMult, 'ast1'))
-images.push(new Img(427, 1062,90,90,0,assets['small_asteroid_1'].src,f2ctx,fg2TransMult, 'ast1i2'))
-images.push(new Img(2248, 780,120,120,0,assets['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2'))
-images.push(new Img(3395, 2021,120,120,0,assets['small_asteroid_2_rot2'].src,f2ctx,fg2TransMult, 'ast2i2'))
-images.push(new Img(2995 ,3494 ,120,120,0,assets['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2i3'))
-images.push(new Img(1395, 361,90,90,0,assets['small_moon_1'].src,bctx,bgTransMult, 'moon1'))
+images.push(new Img(900, 1000, 800, 800, 0, assets['stanza1_gray_vale'].src,m2ctx,mg2TransMult, 'vale'))
+images.push(new Img(900, 1000, 800, 800, 0, assets['stanza1_debris1'].src,mctx,mgTransMult, 'valedebris'))
+images.push(new Img(861, 944, 800, 800, 0, assets['stanza1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
+images.push(new Img(376, 561, 150, 150, 0, assets['small_planet_saturn'].src,bctx,bgTransMult, 'saturn'))
+images.push(new Img(1660, 1597, 700, 700,0, assets['small_cloud'].src,m2ctx,mg2TransMult, 'cloud'))
+images.push(new Img(1698, 224, 90, 90, 0, assets['small_asteroid_1'].src,fctx,fgTransMult, 'ast1'))
+images.push(new Img(427, 1062, 90, 90, 0, assets['small_asteroid_1'].src,f2ctx,fg2TransMult, 'ast1i2'))
+images.push(new Img(2248, 780, 120, 120, 0, assets['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2'))
+images.push(new Img(3395, 2021, 120, 120, 0, assets['small_asteroid_2_rot2'].src,f2ctx,fg2TransMult, 'ast2i2'))
+images.push(new Img(2995 ,3494 ,120, 120, 0, assets['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2i3'))
+images.push(new Img(1395, 361, 90, 90, 0, assets['small_moon_1'].src,bctx,bgTransMult, 'moon1'))
 
-images.push(new Img(929, 3696,520,235,0,assets['stanza8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
-images.push(new Img(1172, 4144,800,230,0,assets['stanza8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
-images.push(new Img(1620, 3523,680,665,0,assets['stanza8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
+//stanza 5
+images.push(new Img(1827, 1277, 90, 90, 0, assets['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
+images.push(new Img(259, 1762, 120, 120, 0, assets['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
+
+images.push(new Img(929, 3696, 520, 235, 0, assets['stanza8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
+images.push(new Img(1172, 4144, 800, 230, 0, assets['stanza8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
+images.push(new Img(1620, 3523, 680, 665, 0, assets['stanza8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
 
 
 
@@ -787,6 +865,26 @@ advancePoem()
 advancePoem()
 advancePoem()
 
+class Chain {
+  constructor(origin,linkCount,linkAngle) {
+    this.origin.x = origin.x
+    this.origin.y = origin.y
+    this.linkCount = linkCount
+    this.linkAngle = linkAngle
+  }
+  update() {
+
+  }
+}
+
+let link = new Image()
+link.src = 'assets/chainlink_circle_large.png'
+let link2 = new Image()
+link2.src = 'assets/chainlink_circle_small.png'
+images.push(new Img(923, 625, 64, 64, 0, link.src, tctx, tTransMult, 'chaintest'))
+images.push(new Img(952, 702, 64, 64, 0, link2.src, tctx, tTransMult, 'chaintest2'))
+
+
 let particles = [];
 
 class Particle {
@@ -796,7 +894,8 @@ class Particle {
     velX = Math.random()*1 - 0.5,
     velY = Math.random()*1 - 0.5,
     radius = particleProperties.radius,
-    color = particleProperties.colors[0]
+    color = particleProperties.colors[0],
+    lifeMax = 1200
   ) {
     this.velX = velX
     this.velY = velY
@@ -806,10 +905,25 @@ class Particle {
     this.y = y
     this.radius = radius
     this.color = color
+    this.lifeMax = lifeMax
+    this.life = this.lifeMax
+    this.dead = false
   }
   draw(ctx) {
+    ctx.save()
+    ctx.beginPath()
+    if(this.life >= this.lifeMax - 100) {
+      ctx.globalAlpha = (this.lifeMax - this.life)/100
+    }
+    else {
+      ctx.globalAlpha = Math.min(100,this.life)/100
+    }
     ctx.moveTo(this.x,this.y)
     ctx.arc(this.x,this.y,this.radius,0,PI*2,false)
+    ctx.fillStyle = this.color
+    ctx.closePath()
+    ctx.fill()
+    ctx.restore()
   }
   update() {
     let mouseDist = Math.round(Math.hypot(this.x - mouseNow.x, this.y - mouseNow.y))
@@ -822,6 +936,10 @@ class Particle {
 
     this.x += this.velX
     this.y += this.velY
+    this.life--
+    if(this.life < 1) {
+      this.dead = true
+    }
   }
 }
 
@@ -839,42 +957,57 @@ function drawParticles(ctx,mult) {
 
     //begin path
     ctx.save()
-    ctx.beginPath()
+    // ctx.beginPath()
     matchingParticles.forEach(ptle => {
       ptle.draw(ctx)
     })
-    ctx.fillStyle = color
-    ctx.filter = 'blur(0.5px)'
-    ctx.fill()
-    ctx.closePath()
+    // ctx.fillStyle = color
+    // ctx.filter = 'blur(0.5px)'
+    // ctx.fill()
+    // ctx.closePath()
     ctx.restore()
   })
 }
 
 
 class ParticleGenerator {
-  constructor(parent,x,y,spawnRate = 90) {
+  constructor(parent,offsetX = 0,offsetY = 0,spawnRate = 45, spawnChance = 0.5, spawnRange = 600) {
     this.parent = parent //object reference
-    this.x = this.parent.x
-    this.y = this.parent.y
+    this.x = this.parent.x + offsetX
+    this.y = this.parent.y + offsetY
     this.spawnRate = spawnRate // how many frames it takes to spawn on average
     this.spawnTimer = this.spawnRate
     this.spawnReady = false // i want to incorporate some randomness and spawn skipping so this will randomly be switched on
-    this.spawnRange = 600
+    this.spawnRange = spawnRange
+    this.spawnChance = spawnChance // ranges from 0.00...1 to 1
   }
   update() {
     this.spawnTimer--
     if(this.spawnTimer <= 0) {
-      particles.push(new Particle(this.x + Math.random()*this.spawnRange - this.spawnRange/2,this.y + Math.random()*this.spawnRange - this.spawnRange/2))
+      if(Math.random() > this.spawnChance) return;
+      particles.push(new Particle(
+        this.x + Math.random()*this.spawnRange - this.spawnRange/2,
+        this.y + Math.random()*this.spawnRange - this.spawnRange/2,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        60*8
+      ))
       this.spawnTimer = this.spawnRate
     }
   }
 }
 
 let particleGens = [];
+
 let particleSource1 = objects.filter(obj => obj.id == 'vale')
 particleSource1 = particleSource1[0]
-particleGens.push(new ParticleGenerator(particleSource1))
+
+let particleSource2 = objects.filter(obj => obj.id == 'waterfall')
+particleSource2 = particleSource2[0]
+
+particleGens.push(new ParticleGenerator(particleSource1),new ParticleGenerator(particleSource2, -20, 630, 35, 0.2, 200))
 
 let records = [];
 
@@ -913,10 +1046,40 @@ function showControls() {
   changelogContainer.classList.toggle('hidden')
 }
 
+function calcCenterForContext(ctx,mult) {
+  let cntr = {
+    x: center.x * mult + (cw/2)*(1- mult),
+    y: center.y * mult + (ch/2)*(1- mult)
+  }
+
+  return cntr
+}
+
+function init() {
+  moveCanvas(undefined,{
+    x: cw/2 - poem['stanza1'][0].x - 180,
+    y: ch/2 - poem['stanza1'][0].y - 80,
+  })
+  initGrid()
+}
 
 
 
+//music system
 
-initGrid()
+let musicState = 1
 
+let mainLoop = new Audio()
+mainLoop.src = audio[`section${musicState}`].mainLoop
+mainLoop.loop = true
+
+function initAudio() {
+  mainLoop.play()
+}
+
+
+//init code
+
+
+init()
 draw()
