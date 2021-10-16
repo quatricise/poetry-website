@@ -1,7 +1,9 @@
 let debug = false;
 let graphics = 'medium';
 let userInteracted = false;
+let audioOn = false;
 const PI = Math.PI
+
 
 let queryInput = document.querySelector('#query-input')
 //labels
@@ -69,6 +71,8 @@ let ch = window.innerHeight
 
 
 window.onresize = () => {
+  let globalTransPrev = globalTranslate
+  globalTranslate = {x:0,y:0}
   let prevCw = cw
   let prevCh = ch
   cw = window.innerWidth
@@ -79,9 +83,14 @@ window.onresize = () => {
     canvas.height = ch
   })
   // moveCanvas(undefined,{
-  //   x: prevCw - cw,
-  //   y: prevCh - ch,
+  //   x: cw/2 - poem['stanza1'][0][0] - 180,
+  //   y: ch/2 - poem['stanza1'][0][1] - 80,
   // })
+
+  moveCanvas(undefined,{
+    x: globalTransPrev.x,
+    y: globalTransPrev.y,
+  })
   // moveCanvas(undefined,{
   //   x: 0 - (cw - prevCw),
   //   y: 0 - (ch - prevCh),
@@ -90,6 +99,9 @@ window.onresize = () => {
 }
 
 //input related variables
+
+// keyboard
+let pressedCtrl = false
 
 //mouse
 let mousedown = false
@@ -154,6 +166,19 @@ bothAxisCheckbox.addEventListener('change', function() {
 document.addEventListener('keydown', function (e) {
   if(e.code == 'Digit1') debug = !debug
   if(e.code == 'Backquote') showControls()
+  if(e.code == 'ControlLeft') {
+    pressedCtrl = true
+    changingXforSelected = true
+    changingYforSelected = true
+  }
+},false)
+
+document.addEventListener('keyup', function (e) {
+  if(e.code == 'ControlLeft') {
+    pressedCtrl = false
+    changingXforSelected = false
+    changingYforSelected = false
+  }
 },false)
 
 // document.addEventListener('wheel', processWheelEvents, {passive: true})
@@ -171,8 +196,7 @@ document.addEventListener('keydown', function (e) {
 //   }
 // }
 
-document.addEventListener('mousemove', function(e) {
-
+function moveObject(e) {
   if(selectedObject) {
     if(changingXforSelected) {
       let dx = e.clientX - mouseNow.x
@@ -214,8 +238,11 @@ document.addEventListener('mousemove', function(e) {
     x: e.clientX,
     y: e.clientY,
   }
-
-})
+}
+ 
+document.addEventListener('mousemove', function(e) {
+  moveObject(e)
+},false)
 
 changelogHandle.addEventListener('mousedown', function(e) {
   mousedown = true
@@ -290,6 +317,11 @@ document.addEventListener('mouseup', function (e) {
 canvasText.addEventListener('mousemove', function (e) {
   if(!mousedown) return
 
+  if(pressedCtrl && selectedObject) {
+    moveObject(e)
+    return
+  }
+  
   if(movingCanvas) {
     moveCanvas(e)
   }
@@ -380,7 +412,6 @@ function draw() {
   })
 
   // draw
-
   drawBg(bctx,bgTransMult)
   drawStars(bctx,bgTransMult)
 
@@ -435,7 +466,10 @@ function draw() {
     img.draw()
   })
   drawParticles(tctx,tTransMult)
-
+  tctx.save()
+  tctx.fillStyle = 'red'
+  tctx.fillRect(-3,-3,6,6)
+  tctx.restore()
   requestAnimationFrame(draw)
   
 }
@@ -695,8 +729,8 @@ function populateCell(cell = null) {
 
 class TextObject {
   constructor(text,ctx, id = Math.floor(Math.random()*1_000_000_000)) {
-    this.x = text[0].x
-    this.y = text[0].y
+    this.x = text[0][0]
+    this.y = text[0][1]
     this.text = text
     this.ctx = ctx
     this.id = id
@@ -721,8 +755,11 @@ class TextObject {
       this.ctx.fillText(this.text[i],this.x,this.y + lineHeight*i - lineHeight)
     }
     if(debug) {
-      this.ctx.fillText(`Text dist from center: ${textdist}`,this.x,this.y - lineHeight*2)
-      this.ctx.fillText(`Alpha value set to: ${1 - segment*textdist/100}`,this.x,this.y - lineHeight*3)
+      this.ctx.fillStyle = 'hsl(0,0%,80%)'
+      this.ctx.font = '14px Arial'
+      this.ctx.fillText(`Id: ${this.id}`,this.x,this.y - lineHeight * 0.8)
+      this.ctx.fillText(`Text dist from center: ${textdist}`,this.x,this.y - lineHeight*2 * 0.8)
+      this.ctx.fillText(`Alpha value set to: ${1 - segment*textdist/100}`,this.x,this.y - lineHeight*3 * 0.8)
     }
     this.ctx.restore()
   }
@@ -740,6 +777,7 @@ class Img {
     this.ctx = ctx
     this.mult = mult
     this.id = id
+    this.maxOpacity = maxOpacity
     objects.push(this)
     initialValues.push({id: this.id, x: this.x, y: this.y})
   }
@@ -760,11 +798,16 @@ class Img {
     }
     // this.ctx.translate(-globalTranslate.x * this.mult + cw/2, -globalTranslate.y * this.mult + ch/2)
     // this.ctx.rotate(this.rotation)
+    this.ctx.save()
+    this.ctx.globalAlpha = this.maxOpacity
     this.ctx.drawImage(this.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+    this.ctx.restore()
 
     if(debug) {
       this.ctx.fillStyle = 'white'
-      this.ctx.fillText(`Filter set to: ${Math.min(0.5 + darken,1)}`,this.x,this.y - lineHeight*2)
+      this.ctx.font = '14px Arial'
+      this.ctx.fillText(`Filter set to: ${Math.min(0.5 + darken,1)}`,this.x,this.y - lineHeight*2 * 0.8)
+      this.ctx.fillText(`Id: ${this.id}`,this.x,this.y - lineHeight*3 * 0.8)
     }
     this.ctx.restore()
 
@@ -822,7 +865,18 @@ images.push(new Img(900, 1000, 800, 800, 0, assets['stanza1_gray_vale'].src,m2ct
 images.push(new Img(900, 1000, 800, 800, 0, assets['stanza1_debris1'].src,mctx,mgTransMult, 'valedebris'))
 images.push(new Img(861, 944, 800, 800, 0, assets['stanza1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
 images.push(new Img(376, 561, 150, 150, 0, assets['small_planet_saturn'].src,bctx,bgTransMult, 'saturn'))
-images.push(new Img(1660, 1597, 700, 700,0, assets['small_cloud'].src,m2ctx,mg2TransMult, 'cloud'))
+
+images.push(new Img(1660, 1597, 700, 700,0, assets['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl'))
+images.push(new Img(1667 , 1474, 700, 700,0, assets['cloud_small_1'].src,mctx,mgTransMult, 'clouds1'))
+images.push(new Img(1639, 1494, 700, 700,0, assets['cloud_small_2'].src,mctx,mgTransMult, 'clouds2'))
+
+// images.push(new Img(949, 1546, 1000, 1000,0, assets['s3_no_stir'].src,mctx,mgTransMult, 's3nostir'))
+
+images.push(new Img(1401, 2013, 1024, 1024,0, assets['s4_grass_bg'].src,mctx,mgTransMult, 's4grassbg'))
+images.push(new Img(1427, 2162, 1024, 1024,0, assets['s4_grass_fg'].src,m2ctx,mg2TransMult, 's4grassfg'))
+images.push(new Img(1462, 2248, 1024, 1024,0, assets['s4_grass_fg2'].src,tctx,tTransMult, 's4grassfg2'))
+// images.push(new Img(1409, 2038, 1200, 1200,0, assets['s4_grass_bg'].src,m2ctx,mg2TransMult, 's4grassfg2')) // just placeholder for more grass
+
 images.push(new Img(1698, 224, 90, 90, 0, assets['small_asteroid_1'].src,fctx,fgTransMult, 'ast1'))
 images.push(new Img(427, 1062, 90, 90, 0, assets['small_asteroid_1'].src,f2ctx,fg2TransMult, 'ast1i2'))
 images.push(new Img(2248, 780, 120, 120, 0, assets['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2'))
@@ -834,9 +888,9 @@ images.push(new Img(1395, 361, 90, 90, 0, assets['small_moon_1'].src,bctx,bgTran
 images.push(new Img(1827, 1277, 90, 90, 0, assets['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
 images.push(new Img(259, 1762, 120, 120, 0, assets['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
 
-images.push(new Img(929, 3696, 520, 235, 0, assets['stanza8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
-images.push(new Img(1172, 4144, 800, 230, 0, assets['stanza8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
-images.push(new Img(1620, 3523, 680, 665, 0, assets['stanza8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
+// images.push(new Img(929, 3696, 520, 235, 0, assets['stanza8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
+// images.push(new Img(1172, 4144, 800, 230, 0, assets['stanza8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
+// images.push(new Img(1620, 3523, 680, 665, 0, assets['stanza8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
 
 
 
@@ -881,8 +935,8 @@ let link = new Image()
 link.src = 'assets/chainlink_circle_large.png'
 let link2 = new Image()
 link2.src = 'assets/chainlink_circle_small.png'
-images.push(new Img(923, 625, 64, 64, 0, link.src, tctx, tTransMult, 'chaintest'))
-images.push(new Img(952, 702, 64, 64, 0, link2.src, tctx, tTransMult, 'chaintest2'))
+images.push(new Img(923, 618, 64, 64, 0, link.src, m2ctx, mg2TransMult, 'chaintest', 0.8))
+images.push(new Img(952, 695, 64, 64, 0, link2.src, m2ctx, mg2TransMult, 'chaintest2', 0.8))
 
 
 let particles = [];
@@ -893,8 +947,8 @@ class Particle {
     y,
     velX = Math.random()*1 - 0.5,
     velY = Math.random()*1 - 0.5,
-    radius = particleProperties.radius,
-    color = particleProperties.colors[0],
+    radius = particleProperties.radius + (Math.random()*particleProperties.radiusRange - particleProperties.radiusRange/2),
+    color,
     lifeMax = 1200
   ) {
     this.velX = velX
@@ -945,41 +999,41 @@ class Particle {
 
 let particleProperties = {
   colors: ['hsl(0,0%,100%)'],
-  radius: 2,
-  radiusRange: 0.5,
+  radius: 2.2,
+  radiusRange: 0.6,
+  lifeMinDefault: 60*4,
+  lifeMaxDefault: 60*8,
 }
 
-function drawParticles(ctx,mult) {
-
-  particleProperties.colors.forEach(color=> {
-    let matchingParticles = particles.filter(ptle => ptle.color == color) //jank this is jank but optimizations come later, need to do a viewport pass
-    if(!matchingParticles) return
-
-    //begin path
-    ctx.save()
-    // ctx.beginPath()
-    matchingParticles.forEach(ptle => {
-      ptle.draw(ctx)
-    })
-    // ctx.fillStyle = color
-    // ctx.filter = 'blur(0.5px)'
-    // ctx.fill()
-    // ctx.closePath()
-    ctx.restore()
+function drawParticles(ctx) {
+  particles.forEach(ptle=> {
+    ptle.draw(ctx)
   })
 }
 
 
 class ParticleGenerator {
-  constructor(parent,offsetX = 0,offsetY = 0,spawnRate = 45, spawnChance = 0.5, spawnRange = 600) {
+  constructor(
+    parent,
+    offset = [0,0],
+    spawnRate = 45,
+    spawnChance = 0.5, 
+    spawnRange = 600, 
+    color = particleProperties.colors[0],
+    lifeMin = particleProperties.lifeMinDefault,
+    lifeMax = particleProperties.lifeMaxDefault,
+  ) {
     this.parent = parent //object reference
-    this.x = this.parent.x + offsetX
-    this.y = this.parent.y + offsetY
+    this.x = this.parent.x + offset[0]
+    this.y = this.parent.y + offset[1]
     this.spawnRate = spawnRate // how many frames it takes to spawn on average
     this.spawnTimer = this.spawnRate
     this.spawnReady = false // i want to incorporate some randomness and spawn skipping so this will randomly be switched on
     this.spawnRange = spawnRange
     this.spawnChance = spawnChance // ranges from 0.00...1 to 1
+    this.color = color
+    this.lifeMin = lifeMin
+    this.lifeMax = lifeMax
   }
   update() {
     this.spawnTimer--
@@ -991,8 +1045,8 @@ class ParticleGenerator {
         undefined,
         undefined,
         undefined,
-        undefined,
-        60*8
+        this.color,
+        Math.random()*(this.lifeMax - this.lifeMin) + this.lifeMin,
       ))
       this.spawnTimer = this.spawnRate
     }
@@ -1001,13 +1055,21 @@ class ParticleGenerator {
 
 let particleGens = [];
 
-let particleSource1 = objects.filter(obj => obj.id == 'vale')
-particleSource1 = particleSource1[0]
 
-let particleSource2 = objects.filter(obj => obj.id == 'waterfall')
-particleSource2 = particleSource2[0]
-
-particleGens.push(new ParticleGenerator(particleSource1),new ParticleGenerator(particleSource2, -20, 630, 35, 0.2, 200))
+particleGenerators.forEach(gen=> {
+  let parent = objects.filter(obj => obj.id == gen.parent)
+  if(parent.length == 0) return
+  particleGens.push(new ParticleGenerator(
+    parent[0],
+    gen.offset,
+    gen.spawnRate,
+    gen.spawnChance,
+    gen.spawnRange,
+    gen.color,
+    gen.lifeMin,
+    gen.lifeMax,
+  ))
+})
 
 let records = [];
 
@@ -1025,7 +1087,7 @@ function viewChanges() {
       removeBtn.classList.add('remove-record-btn')
       removeBtn.setAttribute('onclick', 'this.parentElement.remove()')
       record.classList.add('record')
-      record.innerHTML = `${obj.id} x: <b>${obj.x}</b> y: <b>${obj.y}</b>`
+      record.innerHTML = `<span class='record-title' onclick="navigator.clipboard.writeText(this.parentElement.querySelector('.coords').innerText)">${obj.id}</span> <span class="coords"> <b>${obj.x}</b>, <b>${obj.y}</b></span>`
       record.append(removeBtn)
       records.push(record)
       changelogContainer.append(record)
@@ -1057,8 +1119,8 @@ function calcCenterForContext(ctx,mult) {
 
 function init() {
   moveCanvas(undefined,{
-    x: cw/2 - poem['stanza1'][0].x - 180,
-    y: ch/2 - poem['stanza1'][0].y - 80,
+    x: cw/2 - poem['stanza1'][0][0] - 180,
+    y: ch/2 - poem['stanza1'][0][1] - 80,
   })
   initGrid()
 }
@@ -1070,13 +1132,24 @@ function init() {
 let musicState = 1
 
 let mainLoop = new Audio()
-mainLoop.src = audio[`section${musicState}`].mainLoop
+mainLoop.src = audio[`section${musicState}`].loop1
+mainLoop.load()
 mainLoop.loop = true
-
+mainLoop.oncanplaythrough = function() {
+  console.log('Main loop loaded.')
+}
 function initAudio() {
-  mainLoop.play()
+  if(audioOn) {
+    mainLoop.play()
+  }
 }
 
+function loadAudio(target,src,section) {
+  target.src = audio[`section${section}`][`${src}`]
+  target.oncanplaythrough = function() {
+    // event that does something
+  }
+}
 
 //init code
 

@@ -119,7 +119,10 @@ input[type=checkbox] {
   border-width: 0 0 2px 0;
   border-color: rgb(172, 172, 172);
 }
-
+.record-title {
+  user-select: none;
+  cursor: pointer;
+}
 .heading-small {
   padding: 0;
   margin: 0 0 2px;
