@@ -905,8 +905,11 @@ class Img {
         gradient.addColorStop(
           0.3,
           `hsla(240,17%,7%,${
-            Math.min(1-dist/(this.dimX+this.dimY) + 0.3,
-            1
+            Math.max(
+              Math.min(1-dist/((this.dimX+this.dimY)/2),
+              1
+              ),
+              0
             )
           })`
         )
@@ -972,7 +975,12 @@ class Img {
       this.ctx.fillStyle = 'white'
       this.ctx.font = '14px Arial'
       this.ctx.fillText(`Filter set to: ${Math.min(0.5 + darken,1)}`,this.x,this.y - lineHeight*2 * 0.8)
+      //delete this ↓ nastiness once i fix the rendering to feature separate canvas
       this.ctx.fillText(`Id: ${this.id}`,this.x,this.y - lineHeight*3 * 0.8)
+      let dist = Math.hypot(this.x - mouseNow.x + globalTranslate.x*this.mult,this.y - mouseNow.y + globalTranslate.y*this.mult)
+      if(this.glowUnderCursor) this.ctx.fillText(`${Math.max(Math.min(1-dist/((this.dimX+this.dimY)/2),
+        1
+        ),0)}`, this.x, this.y - lineHeight*4 * 0.8)
     }
 
     this.ctx.restore()
@@ -1031,14 +1039,14 @@ images.push(new Img(900, 1000, 800, 800, 0, imgSources['stanza1_debris1'].src,mc
 images.push(new Img(861, 944, 800, 800, 0, imgSources['stanza1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
 images.push(new Img(376, 561, 150, 150, 0, imgSources['small_planet_saturn'].src,bctx,bgTransMult, 'saturn'))
 
-images.push(new Img(1660, 1597, 700, 700,0, imgSources['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl',undefined,undefined,true))
+images.push(new Img(1660, 1597, 700, 700,0, imgSources['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl'))
 images.push(new Img(1667 , 1474, 700, 700,0, imgSources['cloud_small_1'].src,mctx,mgTransMult, 'clouds1'))
 images.push(new Img(1639, 1494, 700, 700,0, imgSources['cloud_small_2'].src,mctx,mgTransMult, 'clouds2'))
 
 // images.push(new Img(949, 1546, 1000, 1000,0, imgSources['s3_no_stir'].src,mctx,mgTransMult, 's3nostir'))
 
 images.push(new Img(1401, 2013, 1024, 1024,0, imgSources['s4_grass_bg'].src,mctx,mgTransMult, 's4grassbg'))
-images.push(new Img(1427, 2162, 1024, 1024,0, imgSources['s4_grass_fg'].src,m2ctx,mg2TransMult, 's4grassfg'))
+images.push(new Img(1427, 2162, 1024, 1024,0, imgSources['s4_grass_fg'].src,m2ctx,mg2TransMult, 's4grassfg'/* ,undefined,undefined,true */))
 images.push(new Img(1462, 2248, 1024, 1024,0, imgSources['s4_grass_fg2'].src,tctx,tTransMult, 's4grassfg2'))
 // images.push(new Img(1409, 2038, 1200, 1200,0, imgSources['s4_grass_bg'].src,m2ctx,mg2TransMult, 's4grassfg2')) // just placeholder for more grass
 
@@ -1047,7 +1055,7 @@ images.push(new Img(427, 1062, 90, 90, 0, imgSources['small_asteroid_1'].src,f2c
 images.push(new Img(2248, 780, 120, 120, 0, imgSources['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2'))
 images.push(new Img(3395, 2021, 120, 120, 0, imgSources['small_asteroid_2_rot2'].src,f2ctx,fg2TransMult, 'ast2i2'))
 images.push(new Img(2995 ,3494 ,120, 120, 0, imgSources['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2i3'))
-images.push(new Img(1395, 361, 90, 90, 0, imgSources['small_moon_1'].src,bctx,bgTransMult, 'moon1'))
+// images.push(new Img(1395, 361, 90, 90, 0, imgSources['small_moon_1'].src,bctx,bgTransMult, 'moon1'))
 
 //stanza 5
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_bg'].src,b2ctx,bg2TransMult, 's5reedsbg'))
@@ -1055,9 +1063,11 @@ images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_mg'].src,mct
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_naiad_watery'].src,b2ctx,bg2TransMult, 's5naiad'))
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_water_shadow'].src,mctx,mgTransMult, 's5watershadow'))
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_fg'].src,m2ctx,mg2TransMult, 's5reedsfg'))
+//stanza 6
+images.push(new Img(1820, 1199, 1200, 1200, 0, imgSources['s6_margin_sand'].src,m2ctx,mg2TransMult, 's6sand'))
 
-images.push(new Img(1820, 1199, 90, 90, 0, imgSources['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
-images.push(new Img(259, 1762, 120, 120, 0, imgSources['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
+// images.push(new Img(1820, 1199, 90, 90, 0, imgSources['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
+// images.push(new Img(259, 1762, 120, 120, 0, imgSources['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
 
 // images.push(new Img(929, 3696, 520, 235, 0, imgSources['stanza8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
 // images.push(new Img(1172, 4144, 800, 230, 0, imgSources['stanza8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
@@ -1123,7 +1133,8 @@ class Particle {
     velY = Math.random()*1 - 0.5,
     radius = particleProperties.radius + (Math.random()*particleProperties.radiusRange - particleProperties.radiusRange/2),
     color,
-    lifeMax = 1200
+    lifeMax = 1200,
+    parent
   ) {
     this.velX = velX
     this.velY = velY
@@ -1135,6 +1146,7 @@ class Particle {
     this.color = color
     this.lifeMax = lifeMax
     this.life = this.lifeMax
+    this.parent = parent
     this.dead = false
   }
   draw(ctx) {
@@ -1196,6 +1208,16 @@ class ParticleGenerator {
     color = particleProperties.colors[0],
     lifeMin = particleProperties.lifeMinDefault,
     lifeMax = particleProperties.lifeMaxDefault,
+    force = {
+      x: 0,
+      y: 0
+    },
+    velRange = {
+      xMax: 0.5,
+      xMin: -0.5,
+      yMax: 0.5,
+      yMin: -0.5
+    }
   ) {
     this.parent = parent //object reference
     this.x = this.parent.x + offset[0]
@@ -1208,6 +1230,8 @@ class ParticleGenerator {
     this.color = color
     this.lifeMin = lifeMin
     this.lifeMax = lifeMax
+    this.force = force
+    this.velRange = velRange
   }
   update() {
     this.spawnTimer--
@@ -1216,14 +1240,21 @@ class ParticleGenerator {
       particles.push(new Particle(
         this.x + Math.random()*this.spawnRange - this.spawnRange/2,
         this.y + Math.random()*this.spawnRange - this.spawnRange/2,
-        undefined,
-        undefined,
+        Math.random()*(this.velRange.xMax - this.velRange.xMin) + this.velRange.xMin,
+        Math.random()*(this.velRange.yMax - this.velRange.yMin) + this.velRange.yMin,
         undefined,
         this.color,
         Math.random()*(this.lifeMax - this.lifeMin) + this.lifeMin,
+        this
       ))
       this.spawnTimer = this.spawnRate
     }
+    particles.forEach(particle=> {
+      if(particle.parent == this) {
+        particle.velX += this.force.x
+        particle.velY += this.force.y
+      }
+    })
   }
 }
 
@@ -1242,6 +1273,8 @@ particleGenerators.forEach(gen=> {
     gen.color,
     gen.lifeMin,
     gen.lifeMax,
+    gen.force,
+    gen.velRange,
   ))
 })
 

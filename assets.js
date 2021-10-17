@@ -35,6 +35,9 @@ let imgSources = {
   s5_water_shadow: {
     src: 'assets/s5_water_shadow.png'
   },
+  s6_margin_sand: {
+    src: 'assets/s6_margin_sand.png'
+  },
   stanza8_bg_grass: {
     src: 'assets/stanza8_bg_grass_linework_white.png'
   },
@@ -88,13 +91,53 @@ let particleGenerators = [
     lifeMax: 60*8,
   },
   {
-    parent: 'waterfall', // by object id from objects inside objects []
-    offset: [20, 610], // offset the center of the generator by x and y
+    parent: 'waterfall',
+    offset: [20, 610],
     spawnRate: 35,
     spawnChance: 0.2,
     spawnRange: 200,
     color: 'hsl(0,0%,100%)',
     lifeMin: 60*4,
     lifeMax: 60*6,
-  }
+  },
+  {
+    parent: 's5watershadow',
+    offset: [50,500],
+    spawnRate: 50,
+    spawnChance: 0.2,
+    spawnRange: 200,
+    color: 'hsl(0,0%,100%)',
+    lifeMin: 60*4,
+    lifeMax: 60*6,
+    force: {
+      x: 0.1,
+      y: 0.002,
+    },
+    velRange: {
+      xMax: 0.5,
+      xMin: -0.5,
+      yMax: -0.1,
+      yMin: -0.5
+    }
+  },
+  {
+    parent: 's5reedsfg',
+    offset: [0,300],
+    spawnRate: 50,
+    spawnChance: 0.2,
+    spawnRange: 200,
+    color: 'hsl(0,0%,100%)',
+    lifeMin: 60*4,
+    lifeMax: 60*6,
+    force: {
+      x: 0.02,
+      y: 0.002,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: -0.2,
+      yMin: -0.5
+    }
+  },
 ]
