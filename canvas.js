@@ -1,4 +1,5 @@
 let debug = false;
+let controlsVisible = true;
 let graphics = 'medium';
 let userInteracted = false;
 let audioOn = false;
@@ -6,6 +7,7 @@ const PI = Math.PI
 
 
 let queryInput = document.querySelector('#query-input')
+let idDisplay = document.querySelector('#selected-object-id')
 //labels
 let labelX = document.querySelector('#real-x-value')
 let labelY = document.querySelector('#real-y-value')
@@ -18,21 +20,34 @@ let sliderRot = document.querySelector('#rotation-value-slider')
 let bothAxisCheckbox = document.querySelector('#both-axis-checkbox')
 //variable used to hold the selected object
 let selectedObject;
+let selectedCoordsBackup = {x: undefined,y: undefined};
+let matchedObject;
 let queryBox = document.querySelector('#query-box')
 
 let changelogContainer = document.querySelector('#changelog')
 let changelogHandle = document.querySelector('#handle')
 
 let movingChangelog = false;
-
-let viewChangesButton = document.querySelector('#view-changes-btn')
-viewChangesButton.addEventListener('click', function() {
+let viewChangesBtn = document.querySelector('#view-changes-btn')
+viewChangesBtn.addEventListener('click', function() {
   viewChanges()
 })
+
+let saveChangesBtn = document.querySelector('#save-changes-btn')
+saveChangesBtn.addEventListener('click', function() {
+  saveChanges()
+})
+
+let hideObjectBtn = document.querySelector('#hide-object-btn')
+hideObjectBtn.addEventListener('click', function() {
+  if(selectedObject) selectedObject.hidden = !selectedObject.hidden
+})
+
 let objects = []; //all complexi-er objects will be there
 let initialValues = [];
 
 let canvasBg = document.getElementById('canvas-bg')
+let canvasBg2 = document.getElementById('canvas-bg2')
 let canvasMg = document.getElementById('canvas-mg')
 let canvasMg2 = document.getElementById('canvas-mg2')
 let canvasText = document.getElementById('canvas-text')
@@ -40,6 +55,7 @@ let canvasFg = document.getElementById('canvas-fg')
 let canvasFg2 = document.getElementById('canvas-fg2')
 
 const bctx = canvasBg.getContext('2d')
+const b2ctx = canvasBg2.getContext('2d')
 const mctx = canvasMg.getContext('2d')
 const m2ctx = canvasMg2.getContext('2d')
 const tctx = canvasText.getContext('2d')
@@ -48,6 +64,7 @@ const f2ctx = canvasFg2.getContext('2d')
 
 
 let bgTransMult = 0.25
+let bg2TransMult = 0.80
 let mgTransMult = 0.88
 let mg2TransMult = 0.95
 let tTransMult = 1
@@ -56,10 +73,10 @@ let fg2TransMult = 2.2
 
 
 let contexts = []
-contexts.push(bctx,mctx,m2ctx,tctx,fctx,f2ctx)
+contexts.push(bctx,b2ctx,mctx,m2ctx,tctx,fctx,f2ctx)
 
 let canvases = []
-canvases.push(canvasBg,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2)
+canvases.push(canvasBg,canvasBg2,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2)
 canvases.forEach(canvas => {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
@@ -102,6 +119,7 @@ window.onresize = () => {
 
 // keyboard
 let pressedCtrl = false
+let pressedShift = false
 
 //mouse
 let mousedown = false
@@ -170,6 +188,34 @@ document.addEventListener('keydown', function (e) {
     pressedCtrl = true
     changingXforSelected = true
     changingYforSelected = true
+    backupCoords()
+  }
+  if(e.code == 'ShiftLeft') {
+    pressedShift = true
+  }
+  if(e.code == 'KeyT') {
+    if(document.activeElement !== queryInput) {
+      setTimeout(()=> {
+        queryInput.focus();
+        focusedElement = queryInput
+      },25)
+    }
+  }
+  if(e.code == 'KeyH' && selectedObject) {
+    selectedObject.hidden = !selectedObject.hidden
+  }
+  if(e.code == 'KeyC' && (changingXforSelected || changingYforSelected || changingRotforSelected) && selectedObject) {
+    changingXforSelected = false
+    changingYforSelected = false
+    changingRotforSelected = false
+    selectedObject.x = selectedCoordsBackup.x
+    selectedObject.y = selectedCoordsBackup.y
+  }
+  if(e.code == 'KeyZ' || e.code == 'KeyY' ) {
+    undo()
+  }
+  if(e.code == 'KeyD' && selectedObject ) {
+    duplicateObject(selectedObject)
   }
 },false)
 
@@ -178,6 +224,10 @@ document.addEventListener('keyup', function (e) {
     pressedCtrl = false
     changingXforSelected = false
     changingYforSelected = false
+    selectedCoordsBackup = {}
+  }
+  if(e.code == 'ShiftLeft') {
+    pressedShift = false
   }
 },false)
 
@@ -244,6 +294,14 @@ document.addEventListener('mousemove', function(e) {
   moveObject(e)
 },false)
 
+// document.addEventListener('wheel', function(e) {
+//   if(e.deltaY > 0 && selectedObject) {
+//     selectedObject.rotation += 10
+//   }
+//   if(e.deltaY < 0 && selectedObject) {
+//     selectedObject.rotation -= 10
+//   }
+// })
 changelogHandle.addEventListener('mousedown', function(e) {
   mousedown = true
   movingChangelog = true
@@ -254,21 +312,15 @@ changelogHandle.addEventListener('mousedown', function(e) {
 
 queryInput.addEventListener('keydown', function (e) {
   if(e.code == 'Enter' || e.code == 'NumpadEnter') {
-    let filter = objects.filter(obj => obj.id == queryInput.value)
-    if(filter.length == 0) {
-      alert('No object with that id was found.')
-      return
-    }
-    selectedObject = filter[0]
-    labelX.innerHTML = selectedObject.x
-    labelY.innerHTML = selectedObject.y
-    if(selectedObject.x == undefined || selectedObject.y == undefined) console.log('Selected object is missing either X or Y coordinate. pls fix.')
-    console.log(selectedObject)
+    selectObject('from query')
   }
 })
 
+
+
 sliderX.addEventListener('mousedown', function(e) {
   changingXforSelected = true
+  backupCoords()
   mouseNow = {
     x: e.clientX,
     y: e.clientY,
@@ -277,6 +329,7 @@ sliderX.addEventListener('mousedown', function(e) {
 
 sliderY.addEventListener('mousedown', function(e) {
   changingYforSelected = true
+  backupCoords()
   mouseNow = {
     x: e.clientX,
     y: e.clientY,
@@ -284,6 +337,7 @@ sliderY.addEventListener('mousedown', function(e) {
 })
 sliderRot.addEventListener('mousedown', function(e) {
   changingRotforSelected = true
+  backupCoords()
   mouseNow = {
     x: e.clientX,
     y: e.clientY,
@@ -302,6 +356,9 @@ canvasText.addEventListener('mousedown', function (e) {
     userInteracted = true
     initAudio()
   }
+  if(pressedShift) {
+    selectObject('by mouse', matchedObject)
+  }
   
 },false)
 
@@ -310,6 +367,7 @@ document.addEventListener('mouseup', function (e) {
   changingXforSelected = false
   changingYforSelected = false
   changingRotforSelected = false
+  selectedCoordsBackup = {}
   movingCanvas = false
   movingChangelog = false
 },false)
@@ -346,6 +404,7 @@ function moveCanvas(e, offset) {
   dx *= dragMultiplier
   dy *= dragMultiplier
   bctx.translate(dx * bgTransMult,  dy * bgTransMult)
+  b2ctx.translate(dx * bg2TransMult,  dy * bg2TransMult)
   mctx.translate(dx * mgTransMult,  dy * mgTransMult)
   m2ctx.translate(dx * mg2TransMult,  dy * mg2TransMult)
   tctx.translate(dx * tTransMult,   dy * tTransMult)
@@ -369,6 +428,7 @@ function calcMouseTravel(frame1,frame2) {
 //main draw
 function draw() {
   clearCtx(bctx,bgTransMult)
+  clearCtx(b2ctx,bg2TransMult)
   clearCtx(mctx,mgTransMult)
   clearCtx(m2ctx,mg2TransMult)
   clearCtx(tctx,tTransMult)
@@ -404,7 +464,8 @@ function draw() {
   })
   mouseGlow.update()
 
-
+  localStorage.setItem('globalTranslateX', globalTranslate.x)
+  localStorage.setItem('globalTranslateY', globalTranslate.y)
 
   //cleanup
   particles.forEach((particle,index)=> {
@@ -415,11 +476,10 @@ function draw() {
   drawBg(bctx,bgTransMult)
   drawStars(bctx,bgTransMult)
 
-  mouseGlow.draw()
   
-//nasty code that calculates the visual center for each canvas
-// (center.x * bgTransMult + (cw/2)*(1- bgTransMult))
-// (center.y * bgTransMult + (ch/2)*(1- bgTransMult))
+  //nasty code that calculates the visual center for each canvas
+  // (center.x * bgTransMult + (cw/2)*(1- bgTransMult))
+  // (center.y * bgTransMult + (ch/2)*(1- bgTransMult))
 
 
   if(debug) {
@@ -458,50 +518,30 @@ function draw() {
 
   }
 
-  //render portion of draw
+
   textObjects.forEach(obj => {
     obj.draw()
   })
   images.forEach(img => {
     img.draw()
   })
+
+  if(mouseGlow) mouseGlow.draw()
+
   drawParticles(tctx,tTransMult)
-  tctx.save()
-  tctx.fillStyle = 'red'
-  tctx.fillRect(-3,-3,6,6)
-  tctx.restore()
+
+  if(debug) {
+    tctx.save()
+    tctx.fillStyle = 'red'
+    tctx.fillRect(-3,-3,6,6)
+    tctx.restore()
+  }
+  drawSelectionCursor()
+
   requestAnimationFrame(draw)
   
 }
 //end of main draw
-
-
-
-
-//debug functions
-function drawSquare() {
-  tctx.fillStyle = 'hsl(224,85%,80%)'
-  tctx.fillRect(300,300,200,200)
-}
-function drawBgSquare() {
-  bctx.fillStyle = 'hsl(235,20%,30%)'
-  bctx.fillRect(500,500,200,200)
-}
-function drawFgSquare() {
-  fctx.fillStyle = 'hsl(5,30%,50%)'
-  fctx.fillRect(700,700,200,200)
-}
-
-
-
-function drawPoemTest(ctx) {
-  ctx.fillStyle = 'hsl(0,0%,95%)'
-  ctx.font = '16px Arial'
-  ctx.fillText(`Deep in the shady sadness of a vale`,300,300)
-  ctx.fillText(`Far sunken from the healthy breath of morn,`,300,322)
-  ctx.fillText(`Far from the fiery noon, and eve's one star,`,300,344)
-  ctx.fillText(`Sat gray-hair'd Saturn, quiet as a stone,`,300,366)
-}
 
 function clearCtx(ctx,mult) {
   ctx.clearRect(-globalTranslate.x * mult,-globalTranslate.y * mult,cw,ch)
@@ -728,16 +768,30 @@ function populateCell(cell = null) {
 
 
 class TextObject {
-  constructor(text,ctx, id = Math.floor(Math.random()*1_000_000_000)) {
+  constructor(text,ctx,mult, id = Math.floor(Math.random()*1_000_000_000)) {
+    this.id = id
     this.x = text[0][0]
     this.y = text[0][1]
+    this.hidden = false
+    if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
+      this.x = +localStorage.getItem(`${this.id} x`)
+      this.y = +localStorage.getItem(`${this.id} y`)
+    }
+    if(localStorage.getItem(`${this.id} hidden`) == 'false') {
+      this.hidden = false
+    }
+    else if(localStorage.getItem(`${this.id} hidden`) == 'true') {
+      this.hidden = true
+    }
+    
     this.text = text
     this.ctx = ctx
-    this.id = id
+    this.mult = mult
     objects.push(this)
-    initialValues.push({id: this.id, x: this.x, y: this.y})
+    initialValues.push({id: this.id, x: this.x, y: this.y, hidden: this.hidden})
   }
   draw() {
+    if(this.hidden) return
     this.ctx.save()
     let textdist = Math.hypot(this.x + 100 - center.x,this.y + 50 - center.y) //bodge , okay this is gonna be a classic bodge, the bodgiest of all, just hardcode an offset here, nice
     let segment = 80/Math.min(cw,ch)
@@ -749,11 +803,43 @@ class TextObject {
       this.ctx.globalAlpha = 0
     }
 
+    if((matchedObject == this && pressedShift) || (pressedCtrl && selectedObject == this)) {
+      this.ctx.save()
+      if(pressedCtrl) this.ctx.strokeStyle = 'white'
+      else this.ctx.strokeStyle = 'blue'
+      this.ctx.strokeRect(this.x,this.y,300,160)
+      this.ctx.fillStyle = 'hsla(0,0%,100%,0.1)'
+      this.ctx.beginPath()
+      this.ctx.arc(
+        this.x,
+        this.y,
+        50,
+        0,PI*2,false
+        )
+        this.ctx.closePath()
+        this.ctx.fill()
+        if(pressedCtrl) this.ctx.filter = ''
+        else this.ctx.filter = 'brightness(1.5)'
+      }
+      
     this.ctx.fillStyle = textColor
     this.ctx.font = mainfont
     for (let i = 1; i < this.text.length; i++) {
       this.ctx.fillText(this.text[i],this.x,this.y + lineHeight*i - lineHeight)
     }
+
+    if(matchedObject == this && pressedShift) {
+      this.ctx.restore()
+    }
+
+    if(debug || pressedShift) {
+      this.ctx.save()
+      if(selectedObject == this) this.ctx.fillStyle = 'red'
+      else this.ctx.fillStyle = 'white'
+      this.ctx.fillRect(this.x - 6,this.y - 6,12,12)
+      this.ctx.restore()
+    }
+
     if(debug) {
       this.ctx.fillStyle = 'hsl(0,0%,80%)'
       this.ctx.font = '14px Arial'
@@ -766,51 +852,130 @@ class TextObject {
 }
 
 class Img {
-  constructor(x,y,dimX,dimY,rotation = 0,src,ctx, mult, id = Math.floor(Math.random()*1_000_000_000), maxOpacity = 1) {
+  constructor(x,y,dimX,dimY,rotation = 0,src,ctx, mult, id = Math.floor(Math.random()*1_000_000_000), maxOpacity = 1, instanceOf = undefined, glowUnderCursor = false) {
+    this.id = id
     this.dimX = dimX
     this.dimY = dimY
     this.x = x
     this.y = y
+    this.hidden = false
+    if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
+      this.x = +localStorage.getItem(`${this.id} x`)
+      this.y = +localStorage.getItem(`${this.id} y`)
+    }
+    if(localStorage.getItem(`${this.id} hidden`) == 'false') {
+      this.hidden = false
+    }
+    else if(localStorage.getItem(`${this.id} hidden`) == 'true') {
+      this.hidden = true
+    }
     this.rotation = rotation * PI/180 // provide this in deg, convert to radians here
     this.img = new Image()
     this.img.src = src
     this.ctx = ctx
     this.mult = mult
-    this.id = id
     this.maxOpacity = maxOpacity
+    this.instanceOf = instanceOf
+    this.glowUnderCursor = glowUnderCursor
     objects.push(this)
-    initialValues.push({id: this.id, x: this.x, y: this.y})
+    initialValues.push({id: this.id, x: this.x, y: this.y, hidden: this.hidden})
   }
   draw() {
+    if(this.hidden) return
     this.ctx.save()
+
     let dist = Math.hypot(
-      this.x - (center.x * this.mult + (cw/2)*(1- this.mult)), //bodge , okay this is gonna be a classic bodge, the bodgiest of all, just hardcode an offset here, nice
+      this.x - (center.x * this.mult + (cw/2)*(1- this.mult)),
       this.y - (center.y * this.mult + (ch/2)*(1- this.mult))
     )
     let vignetteStrenght = 6
-    let segment = (100/vignetteStrenght)/Math.min(cw,ch) //bodge , the 0.8 x 4 is used to clamp the differences between cw and ch
+    let segment = (100/vignetteStrenght)/Math.min(cw,ch) //bodge but whatever
     let darken = 1 - segment*dist/(100/vignetteStrenght) + segment/2
+
+    if(this.glowUnderCursor) {
+      this.ctx.save()
+      var mouse = {
+        x: mouseNow.x - globalTranslate.x*this.mult,
+        y: mouseNow.y - globalTranslate.y*this.mult,
+      }
+      let dist = Math.hypot(this.x - mouseNow.x + globalTranslate.x*this.mult,this.y - mouseNow.y + globalTranslate.y*this.mult)
+      if(dist < Math.max(this.dimX,this.dimY)) {
+        this.ctx.globalCompositeOperation = 'destination-over'
+        var gradient = this.ctx.createRadialGradient(mouse.x,mouse.y,1,mouse.x,mouse.y,mouseGlowProperties.radius/2)
+        gradient.addColorStop(
+          0.3,
+          `hsla(240,17%,7%,${
+            Math.min(1-dist/(this.dimX+this.dimY) + 0.3,
+            1
+            )
+          })`
+        )
+        gradient.addColorStop(1,'hsla(240,17%,7%,0)')
+        this.ctx.fillStyle = gradient
+        this.ctx.fillRect(
+          mouse.x - mouseGlowProperties.radius/2,
+          mouse.y - mouseGlowProperties.radius/2,
+          mouseGlowProperties.radius,
+          mouseGlowProperties.radius
+        )
+      }
+      this.ctx.globalCompositeOperation = 'source-atop'
+    }
+
     if(darken > 0) {
       this.ctx.filter = `brightness(${Math.min(0.5 + darken,1)})`
     }
     else {
       this.ctx.filter = 'brightness(0.5)'
     }
-    // this.ctx.translate(-globalTranslate.x * this.mult + cw/2, -globalTranslate.y * this.mult + ch/2)
-    // this.ctx.rotate(this.rotation)
+    
+    if((matchedObject == this && pressedShift) || (pressedCtrl && selectedObject == this)) {
+      this.ctx.save()
+      if(pressedCtrl) this.ctx.strokeStyle = 'white'
+      else this.ctx.strokeStyle = 'blue'
+      this.ctx.strokeRect(this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+      this.ctx.fillStyle = 'hsla(0,0%,100%,0.1)'
+      this.ctx.beginPath()
+      this.ctx.arc(
+        this.x,
+        this.y,
+        ((this.dimX+this.dimY)/2)/2,
+        0,PI*2,false
+      )
+      this.ctx.closePath()
+      this.ctx.fill()
+      if(pressedCtrl) this.ctx.filter = ''
+      else this.ctx.filter = 'brightness(1.5)'
+    }
+
     this.ctx.save()
     this.ctx.globalAlpha = this.maxOpacity
     this.ctx.drawImage(this.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
     this.ctx.restore()
 
+    if(this.glowUnderCursor) {
+      this.ctx.restore()
+    }
+
+    if(matchedObject == this && pressedShift  || (pressedCtrl && selectedObject == this)) {
+      this.ctx.restore()
+    }
+    if(debug || pressedShift) {
+      this.ctx.save()
+      if(selectedObject == this) this.ctx.fillStyle = 'orange'
+      else this.ctx.fillStyle = 'white'
+      this.ctx.fillRect(this.x - 6,this.y - 6,12,12)
+      this.ctx.restore()
+    }
     if(debug) {
+      
       this.ctx.fillStyle = 'white'
       this.ctx.font = '14px Arial'
       this.ctx.fillText(`Filter set to: ${Math.min(0.5 + darken,1)}`,this.x,this.y - lineHeight*2 * 0.8)
       this.ctx.fillText(`Id: ${this.id}`,this.x,this.y - lineHeight*3 * 0.8)
     }
-    this.ctx.restore()
 
+    this.ctx.restore()
   }
 }
 
@@ -820,7 +985,7 @@ class MouseGlow {
     this.y = y
     this.radiusInit = radius
     this.radius = this.radiusInit
-    this.radiusRange = this.radius*0.15
+    this.radiusRange = this.radius*0.20
     this.ctx = ctx
     this.mult = mult
     this.img = new Image()
@@ -855,42 +1020,48 @@ class MouseGlow {
   }
 }
 let mouseGlowProperties = {
-  radius: 350
+  radius: 350,
 }
 let mouseGlow = new MouseGlow(0, 0,mouseGlowProperties.radius,tctx, tTransMult)
 
 let images = []
 
-images.push(new Img(900, 1000, 800, 800, 0, assets['stanza1_gray_vale'].src,m2ctx,mg2TransMult, 'vale'))
-images.push(new Img(900, 1000, 800, 800, 0, assets['stanza1_debris1'].src,mctx,mgTransMult, 'valedebris'))
-images.push(new Img(861, 944, 800, 800, 0, assets['stanza1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
-images.push(new Img(376, 561, 150, 150, 0, assets['small_planet_saturn'].src,bctx,bgTransMult, 'saturn'))
+images.push(new Img(900, 1000, 800, 800, 0, imgSources['stanza1_gray_vale'].src,m2ctx,mg2TransMult, 'vale'))
+images.push(new Img(900, 1000, 800, 800, 0, imgSources['stanza1_debris1'].src,mctx,mgTransMult, 'valedebris'))
+images.push(new Img(861, 944, 800, 800, 0, imgSources['stanza1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
+images.push(new Img(376, 561, 150, 150, 0, imgSources['small_planet_saturn'].src,bctx,bgTransMult, 'saturn'))
 
-images.push(new Img(1660, 1597, 700, 700,0, assets['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl'))
-images.push(new Img(1667 , 1474, 700, 700,0, assets['cloud_small_1'].src,mctx,mgTransMult, 'clouds1'))
-images.push(new Img(1639, 1494, 700, 700,0, assets['cloud_small_2'].src,mctx,mgTransMult, 'clouds2'))
+images.push(new Img(1660, 1597, 700, 700,0, imgSources['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl',undefined,undefined,true))
+images.push(new Img(1667 , 1474, 700, 700,0, imgSources['cloud_small_1'].src,mctx,mgTransMult, 'clouds1'))
+images.push(new Img(1639, 1494, 700, 700,0, imgSources['cloud_small_2'].src,mctx,mgTransMult, 'clouds2'))
 
-// images.push(new Img(949, 1546, 1000, 1000,0, assets['s3_no_stir'].src,mctx,mgTransMult, 's3nostir'))
+// images.push(new Img(949, 1546, 1000, 1000,0, imgSources['s3_no_stir'].src,mctx,mgTransMult, 's3nostir'))
 
-images.push(new Img(1401, 2013, 1024, 1024,0, assets['s4_grass_bg'].src,mctx,mgTransMult, 's4grassbg'))
-images.push(new Img(1427, 2162, 1024, 1024,0, assets['s4_grass_fg'].src,m2ctx,mg2TransMult, 's4grassfg'))
-images.push(new Img(1462, 2248, 1024, 1024,0, assets['s4_grass_fg2'].src,tctx,tTransMult, 's4grassfg2'))
-// images.push(new Img(1409, 2038, 1200, 1200,0, assets['s4_grass_bg'].src,m2ctx,mg2TransMult, 's4grassfg2')) // just placeholder for more grass
+images.push(new Img(1401, 2013, 1024, 1024,0, imgSources['s4_grass_bg'].src,mctx,mgTransMult, 's4grassbg'))
+images.push(new Img(1427, 2162, 1024, 1024,0, imgSources['s4_grass_fg'].src,m2ctx,mg2TransMult, 's4grassfg'))
+images.push(new Img(1462, 2248, 1024, 1024,0, imgSources['s4_grass_fg2'].src,tctx,tTransMult, 's4grassfg2'))
+// images.push(new Img(1409, 2038, 1200, 1200,0, imgSources['s4_grass_bg'].src,m2ctx,mg2TransMult, 's4grassfg2')) // just placeholder for more grass
 
-images.push(new Img(1698, 224, 90, 90, 0, assets['small_asteroid_1'].src,fctx,fgTransMult, 'ast1'))
-images.push(new Img(427, 1062, 90, 90, 0, assets['small_asteroid_1'].src,f2ctx,fg2TransMult, 'ast1i2'))
-images.push(new Img(2248, 780, 120, 120, 0, assets['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2'))
-images.push(new Img(3395, 2021, 120, 120, 0, assets['small_asteroid_2_rot2'].src,f2ctx,fg2TransMult, 'ast2i2'))
-images.push(new Img(2995 ,3494 ,120, 120, 0, assets['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2i3'))
-images.push(new Img(1395, 361, 90, 90, 0, assets['small_moon_1'].src,bctx,bgTransMult, 'moon1'))
+images.push(new Img(1698, 224, 90, 90, 0, imgSources['small_asteroid_1'].src,fctx,fgTransMult, 'ast1'))
+images.push(new Img(427, 1062, 90, 90, 0, imgSources['small_asteroid_1'].src,f2ctx,fg2TransMult, 'ast1i2'))
+images.push(new Img(2248, 780, 120, 120, 0, imgSources['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2'))
+images.push(new Img(3395, 2021, 120, 120, 0, imgSources['small_asteroid_2_rot2'].src,f2ctx,fg2TransMult, 'ast2i2'))
+images.push(new Img(2995 ,3494 ,120, 120, 0, imgSources['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2i3'))
+images.push(new Img(1395, 361, 90, 90, 0, imgSources['small_moon_1'].src,bctx,bgTransMult, 'moon1'))
 
 //stanza 5
-images.push(new Img(1827, 1277, 90, 90, 0, assets['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
-images.push(new Img(259, 1762, 120, 120, 0, assets['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_bg'].src,b2ctx,bg2TransMult, 's5reedsbg'))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_mg'].src,mctx,mgTransMult, 's5reedsmg'))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_naiad_watery'].src,b2ctx,bg2TransMult, 's5naiad'))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_water_shadow'].src,mctx,mgTransMult, 's5watershadow'))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_fg'].src,m2ctx,mg2TransMult, 's5reedsfg'))
 
-// images.push(new Img(929, 3696, 520, 235, 0, assets['stanza8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
-// images.push(new Img(1172, 4144, 800, 230, 0, assets['stanza8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
-// images.push(new Img(1620, 3523, 680, 665, 0, assets['stanza8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
+images.push(new Img(1820, 1199, 90, 90, 0, imgSources['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
+images.push(new Img(259, 1762, 120, 120, 0, imgSources['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
+
+// images.push(new Img(929, 3696, 520, 235, 0, imgSources['stanza8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
+// images.push(new Img(1172, 4144, 800, 230, 0, imgSources['stanza8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
+// images.push(new Img(1620, 3523, 680, 665, 0, imgSources['stanza8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
 
 
 
@@ -900,10 +1071,13 @@ let poemState = 0
 
 function advancePoem() {
   let keys = Object.keys(poem)
-  textObjects.push(new TextObject(poem[keys[poemState]],tctx,`s${poemState + 1}`))
+  textObjects.push(new TextObject(poem[keys[poemState]],tctx,tTransMult,`s${poemState + 1}`))
   poemState++
 }
 
+advancePoem()
+advancePoem()
+advancePoem()
 advancePoem()
 advancePoem()
 advancePoem()
@@ -1080,19 +1254,45 @@ function viewChanges() {
   objects.forEach(obj=> {
     let match = initialValues.filter(record => record.id == obj.id)
     let initial = match[0]
-    if(obj.x != initial.x || obj.y != initial.y) {
+    if(obj.x != initial.x || obj.y != initial.y || obj.hidden != initial.hidden) {
       let record = document.createElement('div')
       let removeBtn = document.createElement('span')
       removeBtn.innerHTML = '&nbspX&nbsp'
       removeBtn.classList.add('remove-record-btn')
-      removeBtn.setAttribute('onclick', 'this.parentElement.remove()')
+      removeBtn.setAttribute('onclick', 'this.parentElement.remove(); restoreToInitial(this.parentElement)')
       record.classList.add('record')
-      record.innerHTML = `<span class='record-title' onclick="navigator.clipboard.writeText(this.parentElement.querySelector('.coords').innerText)">${obj.id}</span> <span class="coords"> <b>${obj.x}</b>, <b>${obj.y}</b></span>`
+      record.innerHTML = 
+      `<span class='record-title' onclick="navigator.clipboard.writeText(this.parentElement.querySelector('.data').innerText)">${obj.id}</span> <span class="data" data-id="${obj.id}" data-hidden="${obj.hidden}" data-x="${obj.x}" data-y="${obj.y}"> <b>${obj.x}</b>, <b>${obj.y}</b> hidden: <b>${obj.hidden}</b></span>`
       record.append(removeBtn)
       records.push(record)
       changelogContainer.append(record)
     }
   })
+}
+
+function saveChanges() {
+  records.forEach(rec=> {
+    let dataset = rec.querySelector('.data').dataset
+    localStorage.setItem(dataset.id + ' x', dataset.x)
+    localStorage.setItem(dataset.id + ' y', dataset.y)
+    localStorage.setItem(dataset.id + ' hidden', dataset.hidden)
+  })
+}
+
+function restoreToInitial(src) {
+  let target = objects.filter(obj=> obj.id == src.querySelector('.data').dataset.id).shift()
+  let initial = initialValues.filter(obj=> obj.id == target.id).shift()
+  target.x = initial.x
+  target.y = initial.y
+}
+
+function backupCoords() {
+  if(selectedObject && (selectedCoordsBackup.x == undefined || selectedCoordsBackup.y == undefined)) {
+
+    selectedCoordsBackup.x = selectedObject.x
+    selectedCoordsBackup.y = selectedObject.y
+    console.log(selectedCoordsBackup)
+  }
 }
 
 function loadAsset(asset) {
@@ -1104,6 +1304,7 @@ function loadAsset(asset) {
 }
 
 function showControls() {
+  controlsVisible = !controlsVisible
   queryBox.classList.toggle('hidden')
   changelogContainer.classList.toggle('hidden')
 }
@@ -1117,11 +1318,138 @@ function calcCenterForContext(ctx,mult) {
   return cntr
 }
 
-function init() {
-  moveCanvas(undefined,{
-    x: cw/2 - poem['stanza1'][0][0] - 180,
-    y: ch/2 - poem['stanza1'][0][1] - 80,
+function drawSelectionCursor() {
+  if(!pressedShift) return
+  tctx.save()
+  let center =  {
+    x: mouseNow.x - globalTranslate.x,
+    y: mouseNow.y - globalTranslate.y,
+  }
+  tctx.lineWidth = 2
+  tctx.strokeStyle = 'hsla(0,0%,100%,0.5)'
+  tctx.beginPath()
+  tctx.moveTo(center.x + 5,center.y)
+  tctx.lineTo(center.x + 20,center.y)
+  tctx.stroke()
+  tctx.closePath()
+  tctx.beginPath()
+  tctx.moveTo(center.x,center.y + 5)
+  tctx.lineTo(center.x,center.y + 20)
+  tctx.stroke()
+  tctx.closePath()
+  tctx.beginPath()
+  tctx.moveTo(center.x - 5,center.y)
+  tctx.lineTo(center.x - 20,center.y)
+  tctx.stroke()
+  tctx.closePath()
+  tctx.beginPath()
+  tctx.moveTo(center.x,center.y - 5)
+  tctx.lineTo(center.x,center.y - 20)
+  tctx.stroke()
+  tctx.closePath()
+  tctx.restore()
+  if(matchedObject || selectedObject) {
+    if(matchedObject) {
+      tctx.fillStyle = 'black'
+      tctx.fillRect(center.x + 15, center.y + 5, matchedObject.id.length * 12 + 6, 20)
+      tctx.fillStyle = 'white'
+      tctx.font = '18px Arial'
+      tctx.fillText(matchedObject.id,center.x + 20, center.y + 20)
+    }
+    else
+    if(selectedObject) {
+      tctx.fillStyle = 'black'
+      tctx.fillRect(center.x + 15, center.y + 5, selectedObject.id.length * 12 + 6, 20)
+      tctx.fillStyle = 'white'
+      tctx.font = '18px Arial'
+      tctx.fillText(selectedObject.id,center.x + 20, center.y + 20)
+    }
+  }
+
+  selectNearestToCursor()
+}
+
+function selectNearestToCursor() {
+    let distances = []
+    objects.forEach(obj=> {
+      let dist = Math.hypot(obj.x - mouseNow.x + globalTranslate.x*obj.mult,obj.y - mouseNow.y + globalTranslate.y*obj.mult)
+      distances.push(dist)
+    })
+    let closest = Math.min(...distances)
+    let match = objects.filter(obj => Math.hypot(obj.x - mouseNow.x + globalTranslate.x*obj.mult,obj.y - mouseNow.y + globalTranslate.y*obj.mult) == closest)
+    matchedObject = match[0]
+    
+    // console.log(distances)
+  // objects.forEach(obj=> {
+  //   let dist = Math.hypot(obj.x - mouseNow.x + globalTranslate.x,obj.y - mouseNow.y + globalTranslate.y)
+  //   console.log(dist)
+  // })
+}
+
+function selectObject(source,match) {
+  if(source == 'from query') {
+    let filter = objects.filter(obj => obj.id == queryInput.value)
+    if(filter.length == 0) {
+      alert('No object with that id was found.')
+      return
+    }
+    selectedObject = filter[0]
+  }
+  if(source == 'by mouse' && match) {
+    selectedObject = match
+  }
+  labelX.innerHTML = selectedObject.x
+  labelY.innerHTML = selectedObject.y
+  idDisplay.innerHTML = selectedObject.id
+  if(selectedObject.x == undefined || selectedObject.y == undefined) console.log('Selected object is missing either X or Y coordinate. pls fix.')
+  console.log(selectedObject)
+}
+
+let objectHistory = []
+
+function duplicateObject(obj) {
+  if(obj instanceof Img) {
+    var img = new Img(obj.x,obj.y,obj.dimX,obj.dimY,obj.rotation,obj.img.src,obj.ctx,obj.mult,obj.id + Math.floor(Math.random()*1_000_000_000),obj.maxOpacity,obj.id)
+
+    if(obj.instanceOf) {
+      img.id = obj.instanceOf + Math.floor(Math.random()*1_000_000_000)
+      img.instanceOf = obj.instanceOf
+    }
+    images.push(img)
+    objectHistory.push(img)
+    selectObject('by mouse', img)
+  }
+}
+
+function undo() {
+  let lastObject = objects.filter(obj=> obj.id == objectHistory[objectHistory.length - 1].id).shift()
+  objects.forEach((obj,index)=> {
+    if(obj.id == lastObject.id) {
+      objects.splice(index,1)
+    }
   })
+  if(lastObject instanceof Img) {
+    images.forEach((img,index)=> {
+      if(img.id == lastObject.id) {
+        images.splice(index,1)
+      }
+    })
+  }
+}
+
+function init() {
+  // moveCanvas(undefined,{
+  //   x: cw/2 - poem['stanza1'][0][0] - 180,
+  //   y: ch/2 - poem['stanza1'][0][1] - 80,
+  // })
+  if(controlsVisible) {
+    showControls()
+  }
+  moveCanvas(undefined,{
+    x: localStorage.getItem('globalTranslateX'),
+    y: localStorage.getItem('globalTranslateY'),  
+  })
+
   initGrid()
 }
 
@@ -1156,3 +1484,4 @@ function loadAudio(target,src,section) {
 
 init()
 draw()
+

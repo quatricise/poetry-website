@@ -1,4 +1,4 @@
-let assets = {
+let imgSources = {
   stanza1_gray_vale: {
     src: 'assets/stanza1_gray_vale.png'
   },
@@ -19,6 +19,21 @@ let assets = {
   },
   s4_grass_fg2: {
     src: 'assets/s4_grass_fg2.png'
+  },
+  s5_reeds_bg: {
+    src: 'assets/s5_reeds_bg.png'
+  },
+  s5_reeds_mg: {
+    src: 'assets/s5_reeds_mg.png'
+  },
+  s5_reeds_fg: {
+    src: 'assets/s5_reeds_fg.png'
+  },
+  s5_naiad_watery: {
+    src: 'assets/s5_naiad_watery.png'
+  },
+  s5_water_shadow: {
+    src: 'assets/s5_water_shadow.png'
   },
   stanza8_bg_grass: {
     src: 'assets/stanza8_bg_grass_linework_white.png'

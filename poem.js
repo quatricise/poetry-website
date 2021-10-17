@@ -49,7 +49,7 @@ let poem = {
     `With reverence, though to one who knew it not.`,
   ],
   stanza9: [
-    [ 1420, 4709],
+    [ 1138, 4602],
     `She was a Goddess of the infant world;`,
     `By her in stature the tall Amazon`,
     `Had stood a pigmy's height; she would have ta'en`,
@@ -90,9 +90,25 @@ let poem = {
     `In solemn tenour and deep organ tone:`,
   ],
   stanza15: [
+    [ 1123, 7000],
+    `Some mourning words, which in our feeble tongue`,
+    `Would come in these like accents; O how frail`,
+    `To that large utterance of the early Gods!`,
+    `"Saturn, look up!—though wherefore, poor old King?`,
+  ],
+  stanza16: [
+    [ 1123, 7000],
+    `I have no comfort for thee, no not one:`,
+    `I cannot say, "O wherefore sleepest thou?"`,
+    `For heaven is parted from thee, and the earth`,
+    `Knows thee not, thus afflicted, for a God;`,
+  ],
+  stanza17: [
     [ 0, 0],
-    ``,
-    ``,
+    `And ocean too, with all its solemn noise,`,
+    `Has from thy sceptre pass'd; and all the air`,
+    `Is emptied of thine hoary majesty.`,
+    `Thy thunder, conscious of the new command,`,
   ],
   stanzaN: [
     [ 0, 0],
