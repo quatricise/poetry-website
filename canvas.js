@@ -3,8 +3,16 @@ let controlsVisible = true;
 let graphics = 'medium';
 let userInteracted = false;
 let audioOn = false;
+let lastTimestamp = 0;
+let isTitleVisible = true;
+let isTitleFading = false;
 const PI = Math.PI
 
+let cameraShakeInterval = null;
+
+let scrollVelocity = 0
+let mainTimer = 0
+let mainTimerMax = 60;
 
 let queryInput = document.querySelector('#query-input')
 let idDisplay = document.querySelector('#selected-object-id')
@@ -20,7 +28,8 @@ let sliderRot = document.querySelector('#rotation-value-slider')
 let bothAxisCheckbox = document.querySelector('#both-axis-checkbox')
 //variable used to hold the selected object
 let selectedObject;
-let selectedCoordsBackup = {x: undefined,y: undefined};
+let selected = [];
+let selectedCoordsBackup = [];
 let matchedObject;
 let queryBox = document.querySelector('#query-box')
 
@@ -40,7 +49,7 @@ saveChangesBtn.addEventListener('click', function() {
 
 let hideObjectBtn = document.querySelector('#hide-object-btn')
 hideObjectBtn.addEventListener('click', function() {
-  if(selectedObject) selectedObject.hidden = !selectedObject.hidden
+  if(selected) selected.forEach(obj=> obj.hidden = !obj.hidden)
 })
 
 let objects = []; //all complexi-er objects will be there
@@ -53,6 +62,7 @@ let canvasMg2 = document.getElementById('canvas-mg2')
 let canvasText = document.getElementById('canvas-text')
 let canvasFg = document.getElementById('canvas-fg')
 let canvasFg2 = document.getElementById('canvas-fg2')
+
 
 const bctx = canvasBg.getContext('2d')
 const b2ctx = canvasBg2.getContext('2d')
@@ -71,12 +81,24 @@ let tTransMult = 1
 let fgTransMult = 1.5
 let fg2TransMult = 2.2
 
+let titTransMult = 1
 
 let contexts = []
-contexts.push(bctx,b2ctx,mctx,m2ctx,tctx,fctx,f2ctx)
+contexts.push(bctx,b2ctx,mctx,m2ctx,tctx,fctx,f2ctx,titctx)
+let mults = []
+mults.push(bgTransMult,
+  bg2TransMult,
+  mgTransMult,
+  mg2TransMult,
+  tTransMult,
+  fgTransMult,
+  fg2TransMult,
+  titTransMult
+)
+
 
 let canvases = []
-canvases.push(canvasBg,canvasBg2,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2)
+canvases.push(canvasBg,canvasBg2,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2,canvasTitle)
 canvases.forEach(canvas => {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
@@ -162,7 +184,7 @@ let mainfont;
 //load content 
 async function loadFonts() {
 
-  var font1 = new FontFace('andada', 'url(/fonts/andada_pro/AndadaPro-Italic-VariableFont_wght.ttf)');
+  var font1 = new FontFace('andada', 'url(/fonts/andada_pro/andada_italic_variable.ttf)');
   await font1.load()
 
   // Ready to use the font in a canvas context
@@ -201,21 +223,34 @@ document.addEventListener('keydown', function (e) {
       },25)
     }
   }
-  if(e.code == 'KeyH' && selectedObject) {
-    selectedObject.hidden = !selectedObject.hidden
+  if(e.code == 'KeyH' && selected) {
+    selected.forEach((obj)=> obj.hidden = !obj.hidden)
   }
-  if(e.code == 'KeyC' && (changingXforSelected || changingYforSelected || changingRotforSelected) && selectedObject) {
+  if(e.code == 'KeyC' && (changingXforSelected || changingYforSelected || changingRotforSelected) && selected) {
     changingXforSelected = false
     changingYforSelected = false
     changingRotforSelected = false
-    selectedObject.x = selectedCoordsBackup.x
-    selectedObject.y = selectedCoordsBackup.y
+    selected.forEach((obj,index)=> {
+      obj.x = selectedCoordsBackup[index].x
+      obj.y = selectedCoordsBackup[index].y
+    })
+
   }
   if(e.code == 'KeyZ' || e.code == 'KeyY' ) {
     undo()
   }
-  if(e.code == 'KeyD' && selectedObject ) {
-    duplicateObject(selectedObject)
+  if(e.code == 'KeyD' && selected ) {
+    selected.forEach((obj,index)=> duplicateObject(selected[index]))
+  }
+  if(e.code == 'Escape' && selected ) {
+    selected.forEach(obj=> deselect())
+  }
+  if(e.code == 'Space') {
+    particles.forEach(part=> {
+      part.velX += Math.random()*4 - 2
+      part.velY += Math.random()*4 - 2
+    })
+    shakeCamera(10,260)
   }
 },false)
 
@@ -224,59 +259,89 @@ document.addEventListener('keyup', function (e) {
     pressedCtrl = false
     changingXforSelected = false
     changingYforSelected = false
-    selectedCoordsBackup = {}
+    selectedCoordsBackup = []
+    selected.forEach(obj=> {
+      obj.x = Math.floor(obj.x)
+      obj.y = Math.floor(obj.y)
+    })
   }
   if(e.code == 'ShiftLeft') {
     pressedShift = false
   }
 },false)
 
-// document.addEventListener('wheel', processWheelEvents, {passive: true})
+document.addEventListener('wheel', processWheelEvents, {passive: true})
 
-// function processWheelEvents(e) { //scroll event listener
-//   if(e.deltaY > 0) {
-//     contexts.forEach(ctx=> {
-//       ctx.scale(1.25,1.25)
-//     })
-//   }
-//   if(e.deltaY < 0) {
-//     contexts.forEach(ctx=> {
-//       ctx.scale(0.8,0.8)
-//     })
-//   }
-// }
+function processWheelEvents(e) { //scroll event listener
+  if(e.deltaY < 0 && !pressedCtrl && !pressedShift) {
+    scrollVelocity += 3
+    setTimeout(() => {
+      scrollVelocity += 4
+    }, 20);
+    setTimeout(() => {
+      scrollVelocity += 6
+    }, 40);
+  }
+  if(e.deltaY > 0 && !pressedCtrl && !pressedShift) {
+    scrollVelocity -= 3
+    setTimeout(() => {
+      scrollVelocity -= 4
+    }, 20);
+    setTimeout(() => {
+      scrollVelocity -= 6
+    }, 40);
+  }
+  if(pressedShift && !pressedCtrl && selected.length > 0) {
+    selected.forEach(obj=> {
+      if(obj.dimX && obj.dimY) {
+        obj.dimX = obj.dimX * clamp(e.deltaY,0.95,1.05)
+        obj.dimY = obj.dimY * clamp(e.deltaY,0.95,1.05)
+      }
+    })
+  }
+}
 
 function moveObject(e) {
-  if(selectedObject) {
+  if(selected.length > 0) {
     if(changingXforSelected) {
       let dx = e.clientX - mouseNow.x
-      selectedObject.x += dx
-      labelX.innerHTML = selectedObject.x
+      selected.forEach(obj=> {
+        obj.x += dx * obj.mult
+      })
+      labelX.innerHTML = selected[selected.length - 1].x
       
       if(changeBothAxis) {
         let dy = e.clientY - mouseNow.y
-        selectedObject.y += dy
-        labelY.innerHTML = selectedObject.y  
+        selected.forEach(obj=> {
+          obj.y += dy * obj.mult
+        })
+        labelY.innerHTML = selected[selected.length - 1].y
       }
 
     }
     if(changingYforSelected) {
       let dy = e.clientY - mouseNow.y
-      selectedObject.y += dy
-      labelY.innerHTML = selectedObject.y  
+      selected.forEach(obj=> {
+        obj.y += dy * obj.mult
+      })
+      labelY.innerHTML = selected[selected.length - 1].y
       
       if(changeBothAxis) {
         let dx = e.clientX - mouseNow.x
-        selectedObject.x += dx
-        labelX.innerHTML = selectedObject.x
+        selected.forEach(obj=> {
+          obj.x += dx * obj.mult
+        })
+        labelX.innerHTML = selected[selected.length - 1].x
       }
     }
-    if(changingRotforSelected) {
-        let dx = e.clientX - mouseNow.x
-        selectedObject.rotation += dx *PI/180
-        labelX.innerHTML = selectedObject.rotation
+    // if(changingRotforSelected) {
+    //     let dx = e.clientX - mouseNow.x
+    //     selected.forEach(obj=> {
+    //       obj.rotation += dx *PI/180
+    //     })
+    //     labelX.innerHTML = selectedObject.rotation
 
-    }
+    // }
   }
 
   if(movingChangelog) {
@@ -291,17 +356,28 @@ function moveObject(e) {
 }
  
 document.addEventListener('mousemove', function(e) {
-  moveObject(e)
+  // moveObject(e)
+  // if(!mousedown) return
+
+  if(pressedCtrl && selected && !pressedShift && mousedown) {
+    moveObject(e)
+    return
+  }
+  if(movingChangelog) {
+    moveObject(e)
+    return
+  }
+  
+  if(movingCanvas) {
+    moveCanvas(e)
+  }
+  mouseNow = {
+    x: e.clientX,
+    y: e.clientY,
+  }
+
 },false)
 
-// document.addEventListener('wheel', function(e) {
-//   if(e.deltaY > 0 && selectedObject) {
-//     selectedObject.rotation += 10
-//   }
-//   if(e.deltaY < 0 && selectedObject) {
-//     selectedObject.rotation -= 10
-//   }
-// })
 changelogHandle.addEventListener('mousedown', function(e) {
   mousedown = true
   movingChangelog = true
@@ -356,10 +432,12 @@ canvasText.addEventListener('mousedown', function (e) {
     userInteracted = true
     initAudio()
   }
-  if(pressedShift) {
+  if(pressedShift && !pressedCtrl) {
     selectObject('by mouse', matchedObject)
   }
-  
+  if(pressedShift && pressedCtrl) {
+    selectObject('by mouse', matchedObject, {selectMultiple: true})
+  }
 },false)
 
 document.addEventListener('mouseup', function (e) {
@@ -367,28 +445,28 @@ document.addEventListener('mouseup', function (e) {
   changingXforSelected = false
   changingYforSelected = false
   changingRotforSelected = false
-  selectedCoordsBackup = {}
+  selectedCoordsBackup = []
   movingCanvas = false
   movingChangelog = false
 },false)
 
-canvasText.addEventListener('mousemove', function (e) {
-  if(!mousedown) return
+// canvasText.addEventListener('mousemove', function (e) {
+//   // if(!mousedown) return
 
-  if(pressedCtrl && selectedObject) {
-    moveObject(e)
-    return
-  }
+//   // if(pressedCtrl && selectedObject) {
+//   //   moveObject(e)
+//   //   return
+//   // }
   
-  if(movingCanvas) {
-    moveCanvas(e)
-  }
-  mouseNow = {
-    x: e.clientX,
-    y: e.clientY,
-  }
+//   // if(movingCanvas) {
+//   //   moveCanvas(e)
+//   // }
+//   // mouseNow = {
+//   //   x: e.clientX,
+//   //   y: e.clientY,
+//   // }
 
-},false)
+// },false)
 
 function moveCanvas(e, offset) {
   let dx;
@@ -410,6 +488,8 @@ function moveCanvas(e, offset) {
   tctx.translate(dx * tTransMult,   dy * tTransMult)
   fctx.translate(dx * fgTransMult,  dy * fgTransMult)
   f2ctx.translate(dx * fg2TransMult,  dy * fg2TransMult)
+
+  titctx.translate(dx * titTransMult,  dy * titTransMult)
   
   globalTranslate.x += dx
   globalTranslate.y += dy
@@ -422,21 +502,30 @@ function moveCanvas(e, offset) {
 function calcMouseTravel(frame1,frame2) {
   mouseTravel.x = frame2.x - frame1.x
   mouseTravel.y = frame2.y - frame1.y
-  if(debug) console.log(`Mouse travelled: x:${mouseTravel.x} y: ${mouseTravel.y}`)
+  // if(debug) console.log(`Mouse travelled: x:${mouseTravel.x} y: ${mouseTravel.y}`)
 }
 
 //main draw
-function draw() {
-  clearCtx(bctx,bgTransMult)
+function draw(currentTimestamp) {
+  var dt = (currentTimestamp - lastTimestamp)/1000
+  var fps = 1/dt
+  lastTimestamp = currentTimestamp
+  mainTimer++
+  if(mainTimer > mainTimerMax) mainTimer = 0
+
+  // clearCtx(bctx,bgTransMult)
   clearCtx(b2ctx,bg2TransMult)
   clearCtx(mctx,mgTransMult)
   clearCtx(m2ctx,mg2TransMult)
   clearCtx(tctx,tTransMult)
   clearCtx(fctx,fgTransMult)
   clearCtx(f2ctx,fg2TransMult)
+  clearCtx(titctx,titTransMult)
 
 
   // update
+
+
 
   mouseStates.push(mouseNow)
   if(mouseStates.length > 1) {
@@ -450,12 +539,28 @@ function draw() {
   else {
     mouseTravel.x = mouseTravel.y = 0
   }
+
+  if(Math.abs(scrollVelocity) > 0.02) {
+    moveCanvas(undefined,{x:0, y:Math.round(scrollVelocity)})
+    scrollVelocity *= 0.9
+  }
+  else if(Math.abs(scrollVelocity) < 0.02 && Math.abs(scrollVelocity) > 0 ) {
+    scrollVelocity = 0
+  }
+  else {
+    scrollVelocity = 0
+  }
+  // if(Math.hypot(mouseTravel.x,mouseTravel.y) > 1000) shakeCamera(20,500)
   //update center of screen for tctx
   center.x = -globalTranslate.x + cw/2
   center.y = -globalTranslate.y + ch/2
     
-  populateBorderCells()
-
+  if(mainTimer == mainTimerMax) {
+    populateBorderCells()
+  }
+  // images.forEach(img=> {
+  //   img.animate()
+  // })
   particleGens.forEach(gen => {
     gen.update()
   })
@@ -463,17 +568,20 @@ function draw() {
     particle.update()
   })
   mouseGlow.update()
-
+  mouseTitleGlow.update()
   localStorage.setItem('globalTranslateX', globalTranslate.x)
   localStorage.setItem('globalTranslateY', globalTranslate.y)
 
   //cleanup
-  particles.forEach((particle,index)=> {
-    if(particle.dead) particles.splice(index,1)
-  })
+  if(mainTimer == mainTimerMax) {
+    particles.forEach((particle,index)=> {
+      if(particle.dead) particles.splice(index,1)
+    })
+    deleteFarCells()
+  }
 
   // draw
-  drawBg(bctx,bgTransMult)
+  drawBg(bctx,bgTransMult, {opacity: 1})
   drawStars(bctx,bgTransMult)
 
   
@@ -481,54 +589,55 @@ function draw() {
   // (center.x * bgTransMult + (cw/2)*(1- bgTransMult))
   // (center.y * bgTransMult + (ch/2)*(1- bgTransMult))
 
-
+  // draw debug info
   if(debug) {
-    // drawBgSquare()
-    // drawSquare()
-    // drawFgSquare()
-    
-    // outlineViewport(bctx,bgTransMult)
-    // outlineViewport(tctx,tTransMult)
-    // outlineViewport(fctx,fgTransMult)
-    gridcells.forEach(cell => {
-      bctx.save()
-      bctx.beginPath()
-      bctx.rect(
-        cell.x * stargrid.cellsize + 1,
-        cell.y * stargrid.cellsize + 1,
-        stargrid.cellsize - 1,
-        stargrid.cellsize - 1
-      )
-      if(cell.marked) bctx.strokeStyle = 'red'
-      else bctx.strokeStyle = 'blue'
-      bctx.lineWidth = 1.5
-      bctx.globalAlpha = 0.3
-      bctx.stroke()
-      if(cell.farcell) {
-        bctx.fillStyle = 'red'
-        bctx.fill()
-      }
-      bctx.closePath()
-      bctx.restore()
-    })
-    fctx.font = '12px arial'
-    fctx.fillStyle = 'white'
-    fctx.fillText(`Viewport offset in grid-cells x: ${vpOffset.x} y: ${vpOffset.y}`, 5 - globalTranslate.x * fgTransMult, 15 - globalTranslate.y * fgTransMult)
-    fctx.fillText(`globalTranslate x:${globalTranslate.x} y:${globalTranslate.y}`, 5 - globalTranslate.x * fgTransMult, 30 - globalTranslate.y * fgTransMult)
-
+    drawDebugInfo(fps)
   }
 
 
   textObjects.forEach(obj => {
+    if(
+      obj.x > -globalTranslate.x*obj.mult - 500 &&
+      obj.x < -globalTranslate.x*obj.mult + cw + 500 &&
+      obj.y > -globalTranslate.y*obj.mult - 500 &&
+      obj.y < -globalTranslate.y*obj.mult + ch + 500
+      ) {
+        obj.draw()
+        obj.visible = true
+      }
+      else {
+        obj.visible = false
+        obj.playing = false
+      }
     obj.draw()
   })
   images.forEach(img => {
-    img.draw()
+    if(
+      img.x > -globalTranslate.x*img.mult - img.dimX &&
+      img.x < -globalTranslate.x*img.mult + cw + img.dimX &&
+      img.y > -globalTranslate.y*img.mult - img.dimY &&
+      img.y < -globalTranslate.y*img.mult + ch + img.dimY
+      ) {
+        img.draw()
+        img.visible = true
+      }
+      else {
+        img.visible = false
+      }
   })
 
-  if(mouseGlow) mouseGlow.draw()
+  // contexts.forEach((ctx,index)=> {
+  //   ctx.strokeStyle = 'red'
+  //   ctx.strokeRect(-globalTranslate.x*mults[index],-globalTranslate.y*mults[index],cw,ch)
+  // })
+  if((isTitleVisible || isTitleFading) && mouseTitleGlow) {
+    mouseTitleGlow.draw()
+  }
+  
+  if(mouseGlow && (isTitleFading || !isTitleVisible)) mouseGlow.draw()
+  
 
-  drawParticles(tctx,tTransMult)
+  drawParticles()
 
   if(debug) {
     tctx.save()
@@ -556,16 +665,19 @@ function outlineViewport(ctx,mult) {
   ctx.restore()
 }
 
-function drawBg(ctx,mult) {
+function drawBg(ctx,mult, options = {opacity: 1}) {
+  ctx.save()
   ctx.fillStyle = 'hsl(240,17%,7%)'
+  ctx.globalAlpha = options.opacity
   ctx.fillRect(-globalTranslate.x * mult, -globalTranslate.y * mult,window.innerWidth,window.innerHeight)
+  ctx.restore()
 }
 
 let starProperties = {
-  density: 20, // per grid cell
+  density: 15, // per grid cell
   colors: ['hsl(224,25%,20%)','hsl(272,13%,50%)','hsl(320,60%,25%)','hsl(240,23%,28%)'],
-  radius: 1.5,
-  radiusRange: 0.5,
+  radius: 1.2,
+  radiusRange: 0.3,
 }
 
 let stargrid = {
@@ -584,11 +696,13 @@ class Gridcell {
     this.populated = false
     this.marked = false
     this.farcell = false
+    this.delete = false
   }
 }
 
 class Star {
-  constructor(x,y,radius,color) {
+  constructor(parent,x,y,radius,color) {
+    this.parent = parent
     this.x = x
     this.y = y
     this.radiusInit = radius
@@ -607,11 +721,9 @@ class Star {
   draw(ctx) {
     this.update()
     ctx.moveTo(this.x,this.y)
-    ctx.arc(this.x,this.y,this.radius,0,PI*2,false)
+    ctx.ellipse(this.x,this.y,this.radius + this.radius * mousedown*Math.hypot(mouseTravel.x,mouseTravel.y)/50,this.radius,Math.atan2(mouseTravel.y,mouseTravel.x),0,PI*2,false)
   }
   update() { // update pulse cycle
-    // this.x += 0.04
-    // this.y += 0.04
     this.pulseCycle++
     if(this.pulseCycle > this.pulseCycleMax) {
       this.pulseCycle = -this.pulseCycleMax
@@ -644,12 +756,12 @@ function drawStars(ctx,mult) {
     ctx.fill()
     ctx.closePath()
   })
-  
-  ctx.restore() 
   if(debug) {
     fctx.fillText(`Stars rendered: ${starsVisible.length}`, 5 - globalTranslate.x * fgTransMult, 45 - globalTranslate.y * fgTransMult)
     fctx.fillText(`Stars total: ${stars.length}`, 5 - globalTranslate.x * fgTransMult, 60 - globalTranslate.y * fgTransMult)
   }
+  
+  ctx.restore() 
 }
 
 function generateStar(cell) {
@@ -658,6 +770,7 @@ function generateStar(cell) {
   let radius = starProperties.radius + (Math.random()*starProperties.radiusRange - starProperties.radiusRange/2)
   let color = starProperties.colors[Math.floor(Math.random()*starProperties.colors.length + 0.5)]
   stars.push(new Star(
+    cell,
     x,
     y,
     radius,
@@ -683,37 +796,51 @@ function populateBorderCells() {
   vpOffsetPrev = vpOffset
   
   let num = 0
-  for (let x = vpOffset.x - 2; x < cw/stargrid.cellsize + vpOffset.x + 4; x++) {
-    for (let y = vpOffset.y - 2; y < ch/stargrid.cellsize + vpOffset.y + 4; y++) {
+  for (let x = vpOffset.x - 2; x < cw/stargrid.cellsize + vpOffset.x + 2; x++) {
+    for (let y = vpOffset.y - 2; y < ch/stargrid.cellsize + vpOffset.y + 2; y++) {
       let add = generateCell(x,y)
       num += add
     }
   }
-  console.log(`Added ${num} new cells to the grid.`)
+  // console.log(`Added ${num} new cells to the grid.`)
   
 
+  // let unpopulated = gridcells.filter(
+  //   cell => 
+  //   (
+  //   ( 
+  //     cell.x <= vpOffset.x + 1 && 
+  //     cell.x >= vpOffset.x - 2
+  //   )
+  //   ||
+  //   (
+  //     cell.x >= vpOffset.x + cw/stargrid.cellsize - 1 &&
+  //     cell.x <= vpOffset.x + cw/stargrid.cellsize + 2
+  //   )
+  //   ||
+  //   ( 
+  //     cell.y <= vpOffset.y + 1 && 
+  //     cell.y >= vpOffset.y - 2
+  //   )
+  //   ||
+  //   (
+  //     cell.y >= vpOffset.y + ch/stargrid.cellsize - 1 &&
+  //     cell.y <= vpOffset.y + ch/stargrid.cellsize + 2
+  //   )
+  //   )
+  //   &&
+  //   cell.populated == false
+  // )
   let unpopulated = gridcells.filter(
-    cell => 
+    cell =>
     (
-    ( 
-      cell.x <= vpOffset.x + 1 && 
-      cell.x >= vpOffset.x - 2
-    )
-    ||
-    (
-      cell.x >= vpOffset.x + cw/stargrid.cellsize - 1 &&
-      cell.x <= vpOffset.x + cw/stargrid.cellsize + 2
-    )
-    ||
-    ( 
-      cell.y <= vpOffset.y + 1 && 
-      cell.y >= vpOffset.y - 2
-    )
-    ||
-    (
-      cell.y >= vpOffset.y + ch/stargrid.cellsize - 1 &&
-      cell.y <= vpOffset.y + ch/stargrid.cellsize + 2
-    )
+      cell.x > vpOffset.x - 3 
+      ||
+      cell.x < vpOffset.x + cw/stargrid.cellsize + 2 
+      ||
+      cell.y > vpOffset.y - 3 
+      || 
+      cell.y < vpOffset.y + ch/stargrid.cellsize + 2
     )
     &&
     cell.populated == false
@@ -725,7 +852,38 @@ function populateBorderCells() {
   if(debug) console.log(`Cells populated: ${unpopulated.length}`)
 }
 
-
+function deleteFarCells() {
+  let farcells = gridcells.filter(
+    cell => 
+    (
+      cell.x <= vpOffset.x - 3 
+      ||
+      cell.x >= vpOffset.x + cw/stargrid.cellsize + 2 
+      ||
+      cell.y <= vpOffset.y - 3 
+      || 
+      cell.y >= vpOffset.y + ch/stargrid.cellsize + 2
+    )
+  )
+  let starsDeleted = 0
+  farcells.forEach(cell => cell.delete = true)
+  gridcells.forEach((cell,cindex)=> {
+    if(cell.delete) {
+      stars.forEach((star,sindex)=> {
+        if(star.parent == cell) {
+          stars.splice(sindex,1)
+          starsDeleted++
+        }
+      })
+      gridcells.splice(cindex,1)
+    }
+  })
+  if(debug && farcells.length > 0) {
+    // console.log(`Cells deleted: ${farcells.length}`)
+    // console.log(`Stars deleted: ${starsDeleted}`)
+    // console.log(`Gridcells total: ${gridcells.length}`)
+  }
+}
 
 
 function generateCell(x,y) {
@@ -751,7 +909,13 @@ function initGrid() {
       gridcells.push(new Gridcell(x,y))
     }
   }
-  let visible = gridcells.filter(cell => cell.x >= vpOffset.x && cell.x <= cw/stargrid.cellsize + 1)
+  let visible = gridcells.filter(cell => 
+    cell.x >= vpOffset.x && 
+    cell.x <= cw/stargrid.cellsize + 1 &&
+    cell.y >= vpOffset.y && 
+    cell.y <= ch/stargrid.cellsize + 1
+
+  )
   visible.forEach(cell=> {
     populateCell(cell)
   })
@@ -787,8 +951,16 @@ class TextObject {
     this.text = text
     this.ctx = ctx
     this.mult = mult
+    this.visible = false;
+    this.selected = false
+    this.objectType = "textObject"
     objects.push(this)
-    initialValues.push({id: this.id, x: this.x, y: this.y, hidden: this.hidden})
+    initialValues.push({
+      id: this.id, 
+      x: this.x, 
+      y: this.y, 
+      hidden: this.hidden,
+    })
   }
   draw() {
     if(this.hidden) return
@@ -803,7 +975,7 @@ class TextObject {
       this.ctx.globalAlpha = 0
     }
 
-    if((matchedObject == this && pressedShift) || (pressedCtrl && selectedObject == this)) {
+    if((matchedObject == this && pressedShift)  /* || (pressedCtrl) */ || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.save()
       if(pressedCtrl) this.ctx.strokeStyle = 'white'
       else this.ctx.strokeStyle = 'blue'
@@ -828,7 +1000,7 @@ class TextObject {
       this.ctx.fillText(this.text[i],this.x,this.y + lineHeight*i - lineHeight)
     }
 
-    if(matchedObject == this && pressedShift) {
+    if(matchedObject == this && pressedShift /* || (pressedCtrl)  */|| (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.restore()
     }
 
@@ -844,21 +1016,38 @@ class TextObject {
       this.ctx.fillStyle = 'hsl(0,0%,80%)'
       this.ctx.font = '14px Arial'
       this.ctx.fillText(`Id: ${this.id}`,this.x,this.y - lineHeight * 0.8)
-      this.ctx.fillText(`Text dist from center: ${textdist}`,this.x,this.y - lineHeight*2 * 0.8)
-      this.ctx.fillText(`Alpha value set to: ${1 - segment*textdist/100}`,this.x,this.y - lineHeight*3 * 0.8)
+      // this.ctx.fillText(`Text dist from center: ${textdist}`,this.x,this.y - lineHeight*2 * 0.8)
+      // this.ctx.fillText(`Alpha value set to: ${1 - segment*textdist/100}`,this.x,this.y - lineHeight*3 * 0.8)
     }
     this.ctx.restore()
   }
 }
 
 class Img {
-  constructor(x,y,dimX,dimY,rotation = 0,src,ctx, mult, id = Math.floor(Math.random()*1_000_000_000), maxOpacity = 1, instanceOf = undefined, glowUnderCursor = false) {
+  constructor(
+    x,y,dimX,dimY,rotation = 0,
+    src, 
+    ctx, mult, 
+    id = Math.floor(Math.random()*1_000_000_000), 
+    maxOpacity = 1, instanceOf = undefined, glowUnderCursor = false, shadowSrc = false, animated = false, animation = {
+      frames: [],
+      frameDuration: 60,
+      frameProgress: 0,
+      playing: false,
+      currentFrameNum: 0,
+      framesTotal: 0,
+    }
+    ) {
     this.id = id
     this.dimX = dimX
     this.dimY = dimY
     this.x = x
     this.y = y
     this.hidden = false
+    if(localStorage.getItem(`${this.id} dimX`) || localStorage.getItem(`${this.id} dimY`)) {
+      this.dimX = +localStorage.getItem(`${this.id} dimX`)
+      this.dimY = +localStorage.getItem(`${this.id} dimY`)
+    }
     if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
       this.x = +localStorage.getItem(`${this.id} x`)
       this.y = +localStorage.getItem(`${this.id} y`)
@@ -872,16 +1061,59 @@ class Img {
     this.rotation = rotation * PI/180 // provide this in deg, convert to radians here
     this.img = new Image()
     this.img.src = src
+    if(shadowSrc) {
+      this.shadow = new Image()
+      this.shadow.src = shadowSrc
+    }
+    else {
+      this.shadow = null
+    }
     this.ctx = ctx
     this.mult = mult
     this.maxOpacity = maxOpacity
     this.instanceOf = instanceOf
     this.glowUnderCursor = glowUnderCursor
+    this.visible = false
+    this.selected = false
+    
+    this.animation = {
+      frames: animation.frames,
+      frameProgress: animation.frameProgress,
+      frameDuration: animation.frameDuration,
+      playing: false,
+      currentFrameNum: 0,
+      framesTotal: animation.frames.length,
+    }
+    this.animation.frames.forEach((frame,index)=> {
+      frame.img = new Image()
+      frame.img.src = animation.frames[index].src
+    })
+
+    this.animated = animated
+    this.objectType = "img"
     objects.push(this)
-    initialValues.push({id: this.id, x: this.x, y: this.y, hidden: this.hidden})
+    initialValues.push({
+      id: this.id, 
+      x: this.x, 
+      y: this.y, 
+      hidden: this.hidden,
+      dimX: this.dimX, 
+      dimY: this.dimY,
+    })
   }
   draw() {
     if(this.hidden) return
+    if(this.animated) {
+      var animData = this.animate() 
+      var anim = this.animation;
+      var curFrameNum = anim.currentFrameNum
+      var frameProgress = anim.frameProgress
+      var frameDuration = anim.frameDuration
+      var curFrame = animData.curFrame
+      var nextFrame = animData.nextFrame
+    }
+
+
     this.ctx.save()
 
     let dist = Math.hypot(
@@ -932,9 +1164,9 @@ class Img {
       this.ctx.filter = 'brightness(0.5)'
     }
     
-    if((matchedObject == this && pressedShift) || (pressedCtrl && selectedObject == this)) {
+    if((matchedObject == this && pressedShift) /* || (pressedCtrl) */ || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.save()
-      if(pressedCtrl) this.ctx.strokeStyle = 'white'
+      if(pressedCtrl) this.ctx.strokeStyle = 'hsla(0,0%,100%,0.3)'
       else this.ctx.strokeStyle = 'blue'
       this.ctx.strokeRect(this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
       this.ctx.fillStyle = 'hsla(0,0%,100%,0.1)'
@@ -951,16 +1183,37 @@ class Img {
       else this.ctx.filter = 'brightness(1.5)'
     }
 
+    //animation
     this.ctx.save()
-    this.ctx.globalAlpha = this.maxOpacity
-    this.ctx.drawImage(this.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+    //if not animated
+    if(!this.animated) {
+      this.ctx.globalAlpha = this.maxOpacity
+      this.ctx.drawImage(this.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+    }
+    // if animated
+    if(this.animated) {
+      this.ctx.globalAlpha = curFrame.opacity
+      this.ctx.drawImage(curFrame.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+      this.ctx.globalAlpha = nextFrame.opacity
+      this.ctx.drawImage(nextFrame.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+
+      // console.log(this.animation.frames[this.animation.currentFrameNum].opacity)
+    }
     this.ctx.restore()
+    
+    if(this.shadow) {
+      this.ctx.save()
+      this.ctx.filter = 'brightness(1)'
+      this.ctx.globalAlpha = 1
+      this.ctx.drawImage(this.shadow,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+      this.ctx.restore()
+    }
 
     if(this.glowUnderCursor) {
       this.ctx.restore()
     }
 
-    if(matchedObject == this && pressedShift  || (pressedCtrl && selectedObject == this)) {
+    if((matchedObject == this && pressedShift) || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.restore()
     }
     if(debug || pressedShift) {
@@ -975,6 +1228,8 @@ class Img {
       this.ctx.fillStyle = 'white'
       this.ctx.font = '14px Arial'
       this.ctx.fillText(`Filter set to: ${Math.min(0.5 + darken,1)}`,this.x,this.y - lineHeight*2 * 0.8)
+      this.ctx.fillText(`Currentframe: ${this.animation.currentFrameNum}`,this.x,this.y - lineHeight*6 * 0.8)
+      // this.ctx.fillText(`Visible: ${this.visible}`,this.x,this.y - lineHeight*4 * 0.8)
       //delete this ↓ nastiness once i fix the rendering to feature separate canvas
       this.ctx.fillText(`Id: ${this.id}`,this.x,this.y - lineHeight*3 * 0.8)
       let dist = Math.hypot(this.x - mouseNow.x + globalTranslate.x*this.mult,this.y - mouseNow.y + globalTranslate.y*this.mult)
@@ -984,6 +1239,45 @@ class Img {
     }
 
     this.ctx.restore()
+  }
+  animate() {
+    //make a nice clean and simple animation function, where duration is based on framerate, fuck off
+    let anim = this.animation;
+    let framesTotal = anim.framesTotal
+    let frames = anim.frames
+    let currentFrameNum = anim.currentFrameNum
+    let duration = anim.frameDuration
+    let curFrame;
+    let nextFrame;
+
+    anim.frameProgress++
+    if(anim.frameProgress >= duration) {
+      currentFrameNum++
+      anim.frameProgress = 0
+    }
+    if(currentFrameNum > framesTotal - 1) {
+      currentFrameNum = 0
+    }
+    
+    if(currentFrameNum < framesTotal - 1) {
+      nextFrame = frames[currentFrameNum + 1]
+      curFrame = frames[currentFrameNum]
+    } 
+    else {
+      nextFrame = frames[0]
+      curFrame = frames[framesTotal - 1]
+    }
+
+    anim.currentFrameNum = currentFrameNum
+    curFrame.opacity =  1 - anim.frameProgress/duration
+    nextFrame.opacity = anim.frameProgress/duration
+    if(debug && curFrame.opacity + nextFrame.opacity == 0) console.log(`Total opacity 0!!!!!!!!!!!!!!!!!!!!!!`)
+    
+    if(debug) console.log(`Frame progress: ${anim.frameProgress}`)
+    if(debug) console.log(`Current frame == next frame ${curFrame == nextFrame}`)
+    if(debug) console.log(`Current frame opacity: ${curFrame.opacity}`)
+    if(debug) console.log(`Next frame opacity: ${nextFrame.opacity}`)
+    return {curFrame: curFrame, nextFrame: nextFrame}
   }
 }
 
@@ -1031,12 +1325,12 @@ let mouseGlowProperties = {
   radius: 350,
 }
 let mouseGlow = new MouseGlow(0, 0,mouseGlowProperties.radius,tctx, tTransMult)
-
+let mouseTitleGlow = new MouseGlow(0, 0,mouseGlowProperties.radius,titctx, titTransMult)
 let images = []
 
-images.push(new Img(900, 1000, 800, 800, 0, imgSources['stanza1_gray_vale'].src,m2ctx,mg2TransMult, 'vale'))
-images.push(new Img(900, 1000, 800, 800, 0, imgSources['stanza1_debris1'].src,mctx,mgTransMult, 'valedebris'))
-images.push(new Img(861, 944, 800, 800, 0, imgSources['stanza1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
+images.push(new Img(900, 1000, 800, 800, 0, imgSources['s1_gray_vale'].src,m2ctx,mg2TransMult, 'vale'))
+images.push(new Img(900, 1000, 800, 800, 0, imgSources['s1_debris1'].src,mctx,mgTransMult, 'valedebris'))
+images.push(new Img(861, 944, 800, 800, 0, imgSources['s1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
 images.push(new Img(376, 561, 150, 150, 0, imgSources['small_planet_saturn'].src,bctx,bgTransMult, 'saturn'))
 
 images.push(new Img(1660, 1597, 700, 700,0, imgSources['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl'))
@@ -1046,7 +1340,7 @@ images.push(new Img(1639, 1494, 700, 700,0, imgSources['cloud_small_2'].src,mctx
 // images.push(new Img(949, 1546, 1000, 1000,0, imgSources['s3_no_stir'].src,mctx,mgTransMult, 's3nostir'))
 
 images.push(new Img(1401, 2013, 1024, 1024,0, imgSources['s4_grass_bg'].src,mctx,mgTransMult, 's4grassbg'))
-images.push(new Img(1427, 2162, 1024, 1024,0, imgSources['s4_grass_fg'].src,m2ctx,mg2TransMult, 's4grassfg'/* ,undefined,undefined,true */))
+images.push(new Img(1427, 2162, 1024, 1024,0, imgSources['s4_grass_fg'].src,m2ctx,mg2TransMult, 's4grassfg'))
 images.push(new Img(1462, 2248, 1024, 1024,0, imgSources['s4_grass_fg2'].src,tctx,tTransMult, 's4grassfg2'))
 // images.push(new Img(1409, 2038, 1200, 1200,0, imgSources['s4_grass_bg'].src,m2ctx,mg2TransMult, 's4grassfg2')) // just placeholder for more grass
 
@@ -1059,19 +1353,72 @@ images.push(new Img(2995 ,3494 ,120, 120, 0, imgSources['small_asteroid_2'].src,
 
 //stanza 5
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_bg'].src,b2ctx,bg2TransMult, 's5reedsbg'))
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_mg'].src,mctx,mgTransMult, 's5reedsmg'))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_mg'].src,mctx,mgTransMult, 's5reedsmg',undefined,undefined,false,imgSources['s5_reeds_mg'].shadowSrc))
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_naiad_watery'].src,b2ctx,bg2TransMult, 's5naiad'))
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_water_shadow'].src,mctx,mgTransMult, 's5watershadow'))
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_fg'].src,m2ctx,mg2TransMult, 's5reedsfg'))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_fg'].src,m2ctx,mg2TransMult, 's5reedsfg',undefined,undefined,false,imgSources['s5_reeds_fg'].shadowSrc))
 //stanza 6
-images.push(new Img(1820, 1199, 1200, 1200, 0, imgSources['s6_margin_sand'].src,m2ctx,mg2TransMult, 's6sand'))
+images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand_fill_frame1'].src,mctx,mgTransMult, 's6sand_fill',undefined,undefined,false,false,true,
+{
+  frameDuration: 120, //in frames because fuck you
+  frameProgress: 0,
+  frames: [
+    {
+      src: imgSources['s6_margin_sand_fill_frame1'].src,
+      opacity: 1
+    },
+    {
+      src: imgSources['s6_margin_sand_fill_frame2'].src,
+      opacity: 0
+    },
+    {
+      src: imgSources['s6_margin_sand_fill_frame3'].src,
+      opacity: 0
+    },
+  ]
+}
+))
+// images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand'].src,mctx,mgTransMult, 's6sand'))
+images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand_frame1'].src,mctx,mgTransMult, 's6sand',undefined,undefined,false,false,true,
+{
+  frameDuration: 120, //in frames because fuck you
+  frameProgress: 0,
+  frames: [
+    {
+      src: imgSources['s6_margin_sand_frame1'].src,
+      opacity: 1
+    },
+    {
+      src: imgSources['s6_margin_sand_frame2'].src,
+      opacity: 0
+    },
+  ]
+}
+))
 
+images.push(new Img(1395, 2500, 70, 70, 0, imgSources['s6_moon'].src,mctx,mgTransMult, 's6moon'))
+
+//stanza 7
+images.push(new Img(1820, 2000, 750, 750, 0, imgSources['s8_no_force'].src,m2ctx,mg2TransMult, 's8noforce'))
+images.push(new Img(1820, 2000, 600, 600, 0, imgSources['s7_headbowed'].src,m2ctx,mg2TransMult, 's7headbowed', 0.5))
+images.push(new Img(1820, 4000, 700, 700, 0, imgSources['s7_unsceptered'].src,m2ctx,mg2TransMult, 's7unsceptered'))
+
+//stanza 9
+images.push(new Img(1820, 4000, 800, 800, 0, imgSources['s9_wheel'].src,m2ctx,mg2TransMult, 's9wheel'))
+images.push(new Img(1820, 4000, 372, 282, 0, imgSources['s9_cloud_small_1'].src,mctx,mgTransMult, 's9clouds1'))
+images.push(new Img(1820, 4000, 223, 158, 0, imgSources['s9_cloud_small_2'].src,mctx,mgTransMult, 's9clouds2'))
+//stanza 11
+images.push(new Img(1820, 4000, 800, 800, 0, imgSources['s11_sorrow'].src,m2ctx,mg2TransMult, 's11sorrow'))
+//stanza 12
+images.push(new Img(1820, 4000, 256, 256, 0, imgSources['s12_thunder_small1'].src,mctx,mgTransMult, 's12tsmall1'))
+images.push(new Img(1820, 4000, 512, 512, 0, imgSources['s12_thunder_small2'].src,mctx,mgTransMult, 's12tsmall2'))
+images.push(new Img(1820, 4000, 1024, 1024, 0, imgSources['s12_thunder_large1'].src,m2ctx,mg2TransMult, 's12tlarge1'))
 // images.push(new Img(1820, 1199, 90, 90, 0, imgSources['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
 // images.push(new Img(259, 1762, 120, 120, 0, imgSources['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
 
-// images.push(new Img(929, 3696, 520, 235, 0, imgSources['stanza8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
-// images.push(new Img(1172, 4144, 800, 230, 0, imgSources['stanza8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
-// images.push(new Img(1620, 3523, 680, 665, 0, imgSources['stanza8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
+// images.push(new Img(929, 3696, 520, 235, 0, imgSources['s8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
+// images.push(new Img(1172, 4144, 800, 230, 0, imgSources['s8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
+// images.push(new Img(1620, 3523, 680, 665, 0, imgSources['s8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
 
 
 
@@ -1134,11 +1481,13 @@ class Particle {
     radius = particleProperties.radius + (Math.random()*particleProperties.radiusRange - particleProperties.radiusRange/2),
     color,
     lifeMax = 1200,
-    parent
+    parent,
+    ctx,
+    mult,
   ) {
     this.velX = velX
     this.velY = velY
-    this.velMax = 3
+    this.velMax = 3.5
     this.velDefault = 1
     this.x = x
     this.y = y
@@ -1148,32 +1497,40 @@ class Particle {
     this.life = this.lifeMax
     this.parent = parent
     this.dead = false
+    this.ctx = ctx
+    this.mult = mult
   }
-  draw(ctx) {
-    ctx.save()
-    ctx.beginPath()
+  draw() {
+    this.ctx.save()
+    this.ctx.beginPath()
     if(this.life >= this.lifeMax - 100) {
-      ctx.globalAlpha = (this.lifeMax - this.life)/100
+      this.ctx.globalAlpha = (this.lifeMax - this.life)/100
     }
     else {
-      ctx.globalAlpha = Math.min(100,this.life)/100
+     this.ctx.globalAlpha = Math.max(Math.min(100,this.life)/100,0)
     }
-    ctx.moveTo(this.x,this.y)
-    ctx.arc(this.x,this.y,this.radius,0,PI*2,false)
-    ctx.fillStyle = this.color
-    ctx.closePath()
-    ctx.fill()
-    ctx.restore()
+    this.ctx.moveTo(this.x,this.y)
+    this.ctx.arc(this.x,this.y,this.radius,0,PI*2,false)
+    this.ctx.fillStyle = this.color
+    this.ctx.closePath()
+    this.ctx.fill()
+    this.ctx.restore()
   }
   update() {
-    let mouseDist = Math.round(Math.hypot(this.x - mouseNow.x, this.y - mouseNow.y))
-    let modX;
-    let modY;
+    let mouseDist = Math.round(Math.hypot(this.x - mouseNow.x + globalTranslate.x*this.mult, this.y - mouseNow.y + globalTranslate.y*this.mult))
+    let modX = 0;
+    let modY = 0;
     if(mouseDist < mouseParticleEffectRadius) {
       modX = mouseTravel.x 
       modY = mouseTravel.y 
     }
-
+    this.velX += modX/200
+    this.velY += modY/200
+    let velTotal = Math.hypot(this.velX, this.velY)
+    if(velTotal > this.velMax) {
+      this.velX *= this.velMax/velTotal
+      this.velY *= this.velMax/velTotal
+    }
     this.x += this.velX
     this.y += this.velY
     this.life--
@@ -1185,15 +1542,15 @@ class Particle {
 
 let particleProperties = {
   colors: ['hsl(0,0%,100%)'],
-  radius: 2.2,
-  radiusRange: 0.6,
+  radius: 2.4,
+  radiusRange: 0.8,
   lifeMinDefault: 60*4,
   lifeMaxDefault: 60*8,
 }
 
-function drawParticles(ctx) {
+function drawParticles() {
   particles.forEach(ptle=> {
-    ptle.draw(ctx)
+    ptle.draw()
   })
 }
 
@@ -1217,7 +1574,9 @@ class ParticleGenerator {
       xMin: -0.5,
       yMax: 0.5,
       yMin: -0.5
-    }
+    },
+    ctx,
+    mult
   ) {
     this.parent = parent //object reference
     this.x = this.parent.x + offset[0]
@@ -1232,8 +1591,16 @@ class ParticleGenerator {
     this.lifeMax = lifeMax
     this.force = force
     this.velRange = velRange
+    this.ctx = ctx
+    this.mult = mult
   }
   update() {
+    if(debug) {
+      this.ctx.save()
+      this.ctx.fillStyle = 'orange'
+      this.ctx.fillRect(this.x,this.y,10,10)
+      this.ctx.restore()
+    }
     this.spawnTimer--
     if(this.spawnTimer <= 0) {
       if(Math.random() > this.spawnChance) return;
@@ -1245,7 +1612,9 @@ class ParticleGenerator {
         undefined,
         this.color,
         Math.random()*(this.lifeMax - this.lifeMin) + this.lifeMin,
-        this
+        this,
+        this.ctx,
+        this.mult
       ))
       this.spawnTimer = this.spawnRate
     }
@@ -1262,10 +1631,11 @@ let particleGens = [];
 
 
 particleGenerators.forEach(gen=> {
-  let parent = objects.filter(obj => obj.id == gen.parent)
-  if(parent.length == 0) return
+  let parent = objects.filter(obj => obj.id == gen.parent).shift()
+  if(!parent) return
+  if(parent.hidden) return
   particleGens.push(new ParticleGenerator(
-    parent[0],
+    parent,
     gen.offset,
     gen.spawnRate,
     gen.spawnChance,
@@ -1275,6 +1645,8 @@ particleGenerators.forEach(gen=> {
     gen.lifeMax,
     gen.force,
     gen.velRange,
+    parent.ctx,
+    parent.mult,
   ))
 })
 
@@ -1287,7 +1659,7 @@ function viewChanges() {
   objects.forEach(obj=> {
     let match = initialValues.filter(record => record.id == obj.id)
     let initial = match[0]
-    if(obj.x != initial.x || obj.y != initial.y || obj.hidden != initial.hidden) {
+    if(obj.x != initial.x || obj.y != initial.y || obj.hidden != initial.hidden || obj.dimX != initial.dimX || obj.dimY != initial.dimY) {
       let record = document.createElement('div')
       let removeBtn = document.createElement('span')
       removeBtn.innerHTML = '&nbspX&nbsp'
@@ -1295,7 +1667,15 @@ function viewChanges() {
       removeBtn.setAttribute('onclick', 'this.parentElement.remove(); restoreToInitial(this.parentElement)')
       record.classList.add('record')
       record.innerHTML = 
-      `<span class='record-title' onclick="navigator.clipboard.writeText(this.parentElement.querySelector('.data').innerText)">${obj.id}</span> <span class="data" data-id="${obj.id}" data-hidden="${obj.hidden}" data-x="${obj.x}" data-y="${obj.y}"> <b>${obj.x}</b>, <b>${obj.y}</b> hidden: <b>${obj.hidden}</b></span>`
+      `<span 
+      class='record-title' title="Copy X and Y coordinates."
+      onclick="navigator.clipboard.writeText(this.parentElement.querySelector('.data').innerText)">
+      ${obj.id}
+      </span> 
+      <span 
+      class="data" data-id="${obj.id}" data-hidden="${obj.hidden}" data-x="${obj.x}" data-y="${obj.y}" data-dimx="${Math.round(obj.dimX)}" data-dimy="${Math.round(obj.dimY)}"> 
+      <b>${obj.x}</b>, <b>${obj.y}</b> hidden: <b>${obj.hidden}</b> dimX: <b>${Math.round(obj.dimX)}</b> dimY: <b>${Math.round(obj.dimY)}</b>
+      </span>`
       record.append(removeBtn)
       records.push(record)
       changelogContainer.append(record)
@@ -1308,7 +1688,11 @@ function saveChanges() {
     let dataset = rec.querySelector('.data').dataset
     localStorage.setItem(dataset.id + ' x', dataset.x)
     localStorage.setItem(dataset.id + ' y', dataset.y)
-    localStorage.setItem(dataset.id + ' hidden', dataset.hidden)
+    if(dataset.hidden != undefined) localStorage.setItem(dataset.id + ' hidden', dataset.hidden)
+    if(dataset.dimx != undefined) localStorage.setItem(dataset.id + ' dimX', dataset.dimx)
+    if(dataset.dimy != undefined) localStorage.setItem(dataset.id + ' dimY', dataset.dimy)
+
+    rec.style.backgroundColor = 'hsl(85,30%,65%)'
   })
 }
 
@@ -1317,13 +1701,18 @@ function restoreToInitial(src) {
   let initial = initialValues.filter(obj=> obj.id == target.id).shift()
   target.x = initial.x
   target.y = initial.y
+  target.hidden = initial.hidden
+  if(target.dimX) target.dimX = initial.dimX
+  if(target.dimY) target.dimY = initial.dimY
 }
 
 function backupCoords() {
-  if(selectedObject && (selectedCoordsBackup.x == undefined || selectedCoordsBackup.y == undefined)) {
+  if(selected && (selectedCoordsBackup.length < 1)) {
 
-    selectedCoordsBackup.x = selectedObject.x
-    selectedCoordsBackup.y = selectedObject.y
+    selected.forEach(obj=> {
+      selectedCoordsBackup.push({x: obj.x,y: obj.y})
+    })
+    
     console.log(selectedCoordsBackup)
   }
 }
@@ -1411,31 +1800,79 @@ function selectNearestToCursor() {
     let closest = Math.min(...distances)
     let match = objects.filter(obj => Math.hypot(obj.x - mouseNow.x + globalTranslate.x*obj.mult,obj.y - mouseNow.y + globalTranslate.y*obj.mult) == closest)
     matchedObject = match[0]
-    
-    // console.log(distances)
-  // objects.forEach(obj=> {
-  //   let dist = Math.hypot(obj.x - mouseNow.x + globalTranslate.x,obj.y - mouseNow.y + globalTranslate.y)
-  //   console.log(dist)
-  // })
 }
 
-function selectObject(source,match) {
-  if(source == 'from query') {
-    let filter = objects.filter(obj => obj.id == queryInput.value)
-    if(filter.length == 0) {
-      alert('No object with that id was found.')
-      return
+function selectObject(targetMethod,match, options = {selectMultiple: false}) {
+  if(!match) {
+    var match = null
+  }
+  if(targetMethod == 'by mouse' && match) {
+    if(selected.filter(obj=> obj.id == match.id).length > 0 && selected.length != 1) {
+      selected.forEach((obj,index)=> {
+        if(obj.id == match.id) {
+          selected.splice(index,1)
+          selectedCoordsBackup.splice(index,1)
+        }
+      })
     }
-    selectedObject = filter[0]
+    else {
+      if(!options.selectMultiple) {
+        selected = []
+        selectedCoordsBackup = []
+      }
+      selected.push(match)
+      match.selected = true
+      selectedCoordsBackup.push({x: match.x,y: match.y})
+    }
   }
-  if(source == 'by mouse' && match) {
-    selectedObject = match
+
+  if(targetMethod == 'from query') {
+    let query = queryInput.value;
+    if(query.search("allfrom:","") != -1) {
+      let indexStart = query.search("y")
+      let condition = query.substring(indexStart+1,query.length)
+      console.log(condition)
+      if(condition == -1 || indexStart == -1) return
+      let results = objects.filter(obj=> obj.y > condition)
+      selected = []
+      for (let i = 0; i < results.length; i++) {
+        match = results[i]
+        selected.push(match) 
+      }
+    }
+    else {
+      query = query.split(",")
+      console.log(query)
+      let results = [];
+      query.forEach(query => {
+        let filter = objects.filter(obj => obj.id == query).shift()
+        if(filter) {
+          console.log(filter)
+          results.push(filter)
+        }
+      })
+      console.log('results: ' + results)
+      if(results.length == 0) {
+        alert('No object with that id was found.')
+        return
+      }
+      selected = []
+      for (let i = 0; i < results.length; i++) {
+        match = results[i]
+        selected.push(match) 
+      }
+    }
   }
-  labelX.innerHTML = selectedObject.x
-  labelY.innerHTML = selectedObject.y
-  idDisplay.innerHTML = selectedObject.id
-  if(selectedObject.x == undefined || selectedObject.y == undefined) console.log('Selected object is missing either X or Y coordinate. pls fix.')
-  console.log(selectedObject)
+  if(match) {
+    labelX.innerHTML = match.x
+    labelY.innerHTML = match.y
+    idDisplay.innerHTML = match.id
+  }
+  // console.log(match)
+}
+
+function deselect() {
+  selected = []
 }
 
 let objectHistory = []
@@ -1455,6 +1892,7 @@ function duplicateObject(obj) {
 }
 
 function undo() {
+  if(objectHistory.length < 1) return
   let lastObject = objects.filter(obj=> obj.id == objectHistory[objectHistory.length - 1].id).shift()
   objects.forEach((obj,index)=> {
     if(obj.id == lastObject.id) {
@@ -1470,6 +1908,20 @@ function undo() {
   }
 }
 
+function shakeCamera(amount,duration) {
+  clearInterval(cameraShakeInterval)
+  cameraShakeInterval = setInterval(() => {
+    moveCanvas(undefined,{
+      x: Math.round(Math.random()*amount - amount/2),
+      y: Math.round(Math.random()*amount - amount/2)
+    });
+  }, 25);
+  setTimeout(() => {
+    clearInterval(cameraShakeInterval)
+  }, duration);
+}
+
+
 function init() {
   // moveCanvas(undefined,{
   //   x: cw/2 - poem['stanza1'][0][0] - 180,
@@ -1484,6 +1936,38 @@ function init() {
   })
 
   initGrid()
+}
+
+function drawDebugInfo(fps,) {
+    gridcells.forEach(cell => {
+      bctx.save()
+      bctx.beginPath()
+      bctx.rect(
+        cell.x * stargrid.cellsize + 1,
+        cell.y * stargrid.cellsize + 1,
+        stargrid.cellsize - 1,
+        stargrid.cellsize - 1
+      )
+      if(cell.marked) bctx.strokeStyle = 'red'
+      else bctx.strokeStyle = 'blue'
+      bctx.lineWidth = 1.5
+      bctx.globalAlpha = 0.3
+      bctx.stroke()
+      if(cell.farcell) {
+        bctx.fillStyle = 'red'
+        bctx.fill()
+      }
+      bctx.closePath()
+      bctx.restore()
+    })
+    fctx.font = '12px arial'
+    fctx.fillStyle = 'white'
+    fctx.fillText(`Viewport offset in grid-cells x: ${vpOffset.x} y: ${vpOffset.y}`, 5 - globalTranslate.x * fgTransMult, 15 - globalTranslate.y * fgTransMult)
+    fctx.fillText(`globalTranslate x:${globalTranslate.x} y:${globalTranslate.y}`, 5 - globalTranslate.x * fgTransMult, 30 - globalTranslate.y * fgTransMult)
+    fctx.fillText(`Fps: ${fps.toFixed(2)}`, 5 - globalTranslate.x * fgTransMult, 75 - globalTranslate.y * fgTransMult)
+    fctx.fillText(`Images rendered: ${images.filter(img=> img.visible).length}`, 5 - globalTranslate.x * fgTransMult, 90 - globalTranslate.y * fgTransMult)
+    fctx.fillText(`Text objects rendered: ${textObjects.filter(obj=> obj.visible).length}`, 5 - globalTranslate.x * fgTransMult, 105 - globalTranslate.y * fgTransMult)
+
 }
 
 
@@ -1513,6 +1997,25 @@ function loadAudio(target,src,section) {
 }
 
 //init code
+
+// let object_data;
+// readTextFile("object_data.json", function(text){
+//   object_data = JSON.parse(text);
+//   object_data.forEach(data=> {
+//     if(data.objectType == 'textObject') {
+
+//     }
+//     // objects.push(new TextObject(data.text,data.ctx,data.mult,data.id))
+//     if(data.objectType == 'img') {
+//       let imgSrc = imgSources[data.id]
+//       let ctx = 
+//       let img = new Img(data.x,data.y,data.dimX,data.dimY,data.rotation,data.src,data.ctx,data.mult,data.id,data.maxOpacity,data.instanceOf,data.glowUnderCursor,data.shadowSrc)
+//       images.push(img)
+//       objects.push(img)
+//     }
+//   })
+// });
+
 
 
 init()

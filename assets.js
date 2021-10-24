@@ -1,52 +1,5 @@
 let imgSources = {
-  stanza1_gray_vale: {
-    src: 'assets/stanza1_gray_vale.png'
-  },
-  stanza1_debris1: {
-    src: 'assets/stanza1_debris1.png'
-  },
-  stanza1_debris2: {
-    src: 'assets/stanza1_debris2.png'
-  },
-  s3_no_stir: {
-    src: 'assets/s3_no_stir.png'
-  },
-  s4_grass_bg: {
-    src: 'assets/s4_grass_bg.png'
-  },
-  s4_grass_fg: {
-    src: 'assets/s4_grass_fg.png'
-  },
-  s4_grass_fg2: {
-    src: 'assets/s4_grass_fg2.png'
-  },
-  s5_reeds_bg: {
-    src: 'assets/s5_reeds_bg.png'
-  },
-  s5_reeds_mg: {
-    src: 'assets/s5_reeds_mg.png'
-  },
-  s5_reeds_fg: {
-    src: 'assets/s5_reeds_fg.png'
-  },
-  s5_naiad_watery: {
-    src: 'assets/s5_naiad_watery.png'
-  },
-  s5_water_shadow: {
-    src: 'assets/s5_water_shadow.png'
-  },
-  s6_margin_sand: {
-    src: 'assets/s6_margin_sand.png'
-  },
-  stanza8_bg_grass: {
-    src: 'assets/stanza8_bg_grass_linework_white.png'
-  },
-  stanza8_fg_grass: {
-    src: 'assets/stanza8_fg_grass_linework_white.png'
-  },
-  stanza8_waterfall: {
-    src: 'assets/stanza8_waterfall_linework_white.png'
-  },
+  //general assets
   small_planet_saturn: {
     src: 'assets/small_planet_saturn.png'
   },
@@ -77,6 +30,105 @@ let imgSources = {
   cloud_small_2: {
     src: 'assets/cloud_small_2.png'
   },
+  //stanza specific assets
+  s1_gray_vale: {
+    src: 'assets/stanza1_gray_vale.png'
+  },
+  s1_debris1: {
+    src: 'assets/stanza1_debris1.png'
+  },
+  s1_debris2: {
+    src: 'assets/stanza1_debris2.png'
+  },
+  s3_no_stir: {
+    src: 'assets/s3_no_stir.png'
+  },
+  s4_grass_bg: {
+    src: 'assets/s4_grass_bg.png'
+  },
+  s4_grass_fg: {
+    src: 'assets/s4_grass_fg.png'
+  },
+  s4_grass_fg2: {
+    src: 'assets/s4_grass_fg2.png'
+  },
+  s5_reeds_bg: {
+    src: 'assets/s5_reeds_bg.png'
+  },
+  s5_reeds_mg: {
+    src: 'assets/s5_reeds_mg.png',
+    shadowSrc: 'assets/s5_reeds_mg_shadow.png',
+  },
+  s5_reeds_fg: {
+    src: 'assets/s5_reeds_fg.png',
+    shadowSrc: 'assets/s5_reeds_fg_shadow.png',
+  },
+  s5_naiad_watery: {
+    src: 'assets/s5_naiad_watery.png'
+  },
+  s5_water_shadow: {
+    src: 'assets/s5_water_shadow.png'
+  },
+  s6_margin_sand: {
+    src: 'assets/s6_margin_sand.png'
+  },
+  s6_margin_sand_frame1: {
+    src: 'assets/s6_margin_sand_frame1.png'
+  },
+  s6_margin_sand_frame2: {
+    src: 'assets/s6_margin_sand_frame2.png'
+  },
+  s6_margin_sand_fill_frame1: {
+    src: 'assets/s6_margin_sand_fill_frame1.png'
+  },
+  s6_margin_sand_fill_frame2: {
+    src: 'assets/s6_margin_sand_fill_frame2.png'
+  },
+  s6_margin_sand_fill_frame3: {
+    src: 'assets/s6_margin_sand_fill_frame3.png'
+  },
+  s6_moon: {
+    src: 'assets/s6_moon.png'
+  },
+  s7_headbowed: {
+    src: 'assets/sketch_s7_headbowed.png'
+  },
+  s7_unsceptered: {
+    src: 'assets/s7_unsceptered.png'
+  },
+  s8_no_force: {
+    src: 'assets/s8_no_force.png'
+  },
+  s8_bg_grass: {
+    src: 'assets/stanza8_bg_grass_linework_white.png'
+  },
+  s8_fg_grass: {
+    src: 'assets/stanza8_fg_grass_linework_white.png'
+  },
+  s8_waterfall: {
+    src: 'assets/stanza8_waterfall_linework_white.png'
+  },
+  s9_wheel: {
+    src: 'assets/s9_wheel.png'
+  },
+  s9_cloud_small_1: {
+    src: 'assets/s9_cloud_small_1.png'
+  },
+  s9_cloud_small_2: {
+    src: 'assets/s9_cloud_small_2.png'
+  },
+  s11_sorrow: {
+    src: 'assets/s11_sorrow.png'
+  },
+  s12_thunder_small1: {
+    src: 'assets/s12_thunder_small1.png'
+  },
+  s12_thunder_small2: {
+    src: 'assets/s12_thunder_small2.png'
+  },
+  s12_thunder_large1: {
+    src: 'assets/s12_thunder_large1.png'
+  },
 }
 
 let particleGenerators = [
@@ -88,25 +140,37 @@ let particleGenerators = [
     spawnRange: 400,
     color: 'hsl(250,10%,75%)',
     lifeMin: 60*6,
-    lifeMax: 60*8,
+    lifeMax: 60*12,
+    force: undefined,
+    velRange: undefined,
   },
   {
     parent: 'waterfall',
-    offset: [20, 610],
+    offset: [20, 150],
     spawnRate: 35,
     spawnChance: 0.2,
     spawnRange: 200,
     color: 'hsl(0,0%,100%)',
     lifeMin: 60*4,
     lifeMax: 60*6,
+    force: {
+      x: 0,
+      y: 0.002,
+    },
+    velRange: {
+      xMax: 0.5,
+      xMin: -0.5,
+      yMax: -0.1,
+      yMin: -0.5
+    },
   },
   {
     parent: 's5watershadow',
-    offset: [50,500],
-    spawnRate: 50,
+    offset: [50,300],
+    spawnRate: 25,
     spawnChance: 0.2,
     spawnRange: 200,
-    color: 'hsl(0,0%,100%)',
+    color: 'hsla(0,0%,100%,0.5)',
     lifeMin: 60*4,
     lifeMax: 60*6,
     force: {
@@ -118,7 +182,7 @@ let particleGenerators = [
       xMin: -0.5,
       yMax: -0.1,
       yMin: -0.5
-    }
+    },
   },
   {
     parent: 's5reedsfg',
@@ -126,11 +190,11 @@ let particleGenerators = [
     spawnRate: 50,
     spawnChance: 0.2,
     spawnRange: 200,
-    color: 'hsl(0,0%,100%)',
+    color: 'hsla(0,0%,100%,0.5)',
     lifeMin: 60*4,
     lifeMax: 60*6,
     force: {
-      x: 0.02,
+      x: 0.01,
       y: 0.002,
     },
     velRange: {
@@ -138,6 +202,86 @@ let particleGenerators = [
       xMin: -0.2,
       yMax: -0.2,
       yMin: -0.5
-    }
+    },
+  },
+  {
+    parent: 's5naiad',
+    offset: [0,0],
+    spawnRate: 120,
+    spawnChance: 0.2,
+    spawnRange: 100,
+    color: 'hsla(0,0%,100%,0.5)',
+    lifeMin: 60*4,
+    lifeMax: 60*6,
+    force: {
+      x: 0.01,
+      y: 0.002,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.1,
+      yMax: -0.2,
+      yMin: -0.5
+    },
+  },
+  {
+    parent: 's6sand_fill',
+    offset: [-100,300],
+    spawnRate: 20,
+    spawnChance: 0.2,
+    spawnRange: 150,
+    color: 'hsla(240,15%,80%,0.6)',
+    lifeMin: 60*4,
+    lifeMax: 60*10,
+    force: {
+      x: 0,
+      y: -0.001,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: 0,
+      yMin: -0.4
+    },
+  },
+  {
+    parent: 's6sand_fill',
+    offset: [50,400],
+    spawnRate: 20,
+    spawnChance: 0.2,
+    spawnRange: 150,
+    color: 'hsla(240,15%,80%,0.6)',
+    lifeMin: 60*4,
+    lifeMax: 60*10,
+    force: {
+      x: 0,
+      y: -0.001,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: 0,
+      yMin: -0.4
+    },
+  },
+  {
+    parent: 's6sand_fill',
+    offset: [200,550],
+    spawnRate: 60,
+    spawnChance: 0.2,
+    spawnRange: 150,
+    color: 'hsla(240,15%,80%,0.6)',
+    lifeMin: 60*4,
+    lifeMax: 60*10,
+    force: {
+      x: 0,
+      y: -0.001,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: 0,
+      yMin: -0.4
+    },
   },
 ]

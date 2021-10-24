@@ -34,7 +34,7 @@
       <span class="slider-label" id="rotation-value">0</span>
       <div class="slider rot" id="rotation-value-slider"></div>
     </div>
-    <div class="slider-cont">
+    <div class="slider-cont hidden">
       <input type="checkbox" name="both-axis" id="both-axis-checkbox">
       <label for="both-axis-checkbox" class="slider-label">Change both axis.</label>
     </div>
@@ -50,12 +50,27 @@
       <div class="handle" id="handle">|||</div>
       <h3 class="heading-small">Changed objects:</h3>
       <div class="filler"></div>
-      <div id="save-changes-btn"> Save changes</div>
+      <div id="save-changes-btn">Save changes</div>
     </div>
   </div>
+  <div onclick="hideTitleScreen()" class="title-screen">
+    <canvas id="canvas-title"></canvas>
+    <div class="text">
+      <h4>John Keats</h4>
+      <h1>Hyperion</h1>
+      <div class="divider"></div>
+      <h2>Book I</h2>
+    </div>
+
+  </div>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/gsap/3.8.0/gsap.min.js" integrity="sha512-eP6ippJojIKXKO8EPLtsUMS+/sAGHGo1UN/38swqZa1ypfcD4I0V/ac5G3VzaHfDaklFmQLEs51lhkkVaqg60Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="poem.js"></script>
   <script src="assets.js"></script>
   <script src="audio.js"></script>
+  <script src="title_screen.js"></script>
+  <script src="export_json.js"></script>
+  <script src="object_data.json"></script>
+  <script src="math_stuff.js"></script>
   <script src="canvas.js"></script>
 </body>
 </html>
