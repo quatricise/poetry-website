@@ -16,7 +16,6 @@ function readObjectData() {
   let objs = JSON.parse(text);
 
   objs.forEach((obj,index)=> {
-    if(index > 1) return
     let ctx;
     if(obj.mult == bgTransMult) ctx = bctx
     if(obj.mult == bg2TransMult) ctx = b2ctx
@@ -41,9 +40,40 @@ function readObjectData() {
       obj.glowUnderCursor,
       obj.shadowSrc,
       obj.animated,
-      obj.animation, //fix the urls here
+      obj.animation,
       obj.filter,
+      obj.chainlink
+    ))
+    if(obj.objectType == 'textObject') textObjects.push(new TextObject(
+      obj.x,
+      obj.y,
+      obj.text,
+      ctx,
+      obj.mult,
+      obj.id,
+      obj.font
     ))
   })
+
+  particleGenerators.forEach(gen=> {
+    let parent = objects.filter(obj => obj.id == gen.parent).shift()
+    if(!parent) return
+    if(parent.hidden) return
+    particleGens.push(new ParticleGenerator(
+      parent,
+      gen.offset,
+      gen.spawnRate,
+      gen.spawnChance,
+      gen.spawnRange,
+      gen.color,
+      gen.lifeMin,
+      gen.lifeMax,
+      gen.force,
+      gen.velRange,
+      parent.ctx,
+      parent.mult,
+    ))
+  })
+
 });
 }

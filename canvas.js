@@ -19,9 +19,12 @@ let cameraShakeInterval = null;
 
 let scrollVelocity = 0
 let scrollFriction = 0.08
-let mainTimer = 0
-let mainTimerMax = 60;
-
+let mainTimer = [0,60]
+let movedTimer = [0,60*8]
+let timers = [
+  mainTimer,
+  movedTimer,
+]
 let queryInput = document.querySelector('#query-input')
 let idDisplay = document.querySelector('#selected-object-id')
 //labels
@@ -58,6 +61,13 @@ saveChangesBtn.addEventListener('click', function() {
 let hideObjectBtn = document.querySelector('#hide-object-btn')
 hideObjectBtn.addEventListener('click', function() {
   if(selected) selected.forEach(obj=> obj.hidden = !obj.hidden)
+})
+
+let deleteObjectBtn = document.querySelector('#delete-object-btn')
+deleteObjectBtn.addEventListener('click', function() {
+  if(selected) selected.forEach(obj=> 
+    deleteObject(obj)
+  )
 })
 let hintContainer = document.querySelector('#hint-overlay')
 
@@ -232,8 +242,14 @@ document.addEventListener('keydown', function (e) {
     })
 
   }
+  if(e.code == 'KeyX') {
+    selected.forEach(obj=> deleteObject(obj))
+  }
   if(e.code == 'KeyZ' || e.code == 'KeyY' ) {
     undo()
+  }
+  if(e.code == 'KeyS') {
+    exportToJsonFile(objects)
   }
   if(e.code == 'KeyD' && selected ) {
     selected.forEach((obj,index)=> duplicateObject(selected[index]))
@@ -248,6 +264,7 @@ document.addEventListener('keydown', function (e) {
     })
     shakeCamera(10,260)
   }
+
 },false)
 
 document.addEventListener('keyup', function (e) {
@@ -354,9 +371,6 @@ function moveObject(e) {
 }
  
 document.addEventListener('mousemove', function(e) {
-  // moveObject(e)
-  // if(!mousedown) return
-
   if(pressedCtrl && selected && !pressedShift && mousedown) {
     moveObject(e)
     return
@@ -380,14 +394,14 @@ document.addEventListener('mousemove', function(e) {
 function dismissHint(forWhat) {
   if(forWhat == 'movement') {
     userUnderstand.movement = true
-    clearTimeout(userUnderstand.hintMovement)
+    clearInterval(userUnderstand.hintMovement)
     let filtered = hints.filter(hint=> hint.forWhat == 'movement')
     if(filtered.length > 0) filtered.forEach(hint=> hint.dismissed = true)
   }
   else
   if(forWhat == 'scroll') {
     userUnderstand.scroll = true
-    clearTimeout(userUnderstand.hintScroll)
+    clearInterval(userUnderstand.hintScroll)
     let filtered = hints.filter(hint=> hint.forWhat == 'scroll')
     if(filtered.length > 0) filtered.forEach(hint=> hint.dismissed = true)
   }
@@ -464,27 +478,32 @@ document.addEventListener('mouseup', function (e) {
   movingChangelog = false
 },false)
 
-// canvasText.addEventListener('mousemove', function (e) {
-//   // if(!mousedown) return
 
-//   // if(pressedCtrl && selectedObject) {
-//   //   moveObject(e)
-//   //   return
-//   // }
-  
-//   // if(movingCanvas) {
-//   //   moveCanvas(e)
-//   // }
-//   // mouseNow = {
-//   //   x: e.clientX,
-//   //   y: e.clientY,
-//   // }
-
-// },false)
-
+let decreaseMaxOpacityOverTimeTimer;
+let chainlinksInvisibleTimer = 0
+let decreasingChainlinkOpacity = false
 function moveCanvas(e, offset) {
-
-
+  // clearInterval(decreaseMaxOpacityOverTimeTimer)
+  chainlinksInvisibleTimer++
+  if(!decreasingChainlinkOpacity) {
+    decreasingChainlinkOpacity = true;
+    // console.log('Started decreaseopacityovertime interval')
+    decreaseMaxOpacityOverTimeTimer = setInterval(() => {
+      images.forEach(img => {
+        if(img.chainlink) {
+          img.maxOpacity = clamp(img.maxOpacity - 0.006,0,1)
+          if(img.maxOpacity <= 0) {
+            clearInterval(decreaseMaxOpacityOverTimeTimer)
+            chainlinksInvisibleTimer = 60 * 6
+            decreasingChainlinkOpacity = false
+            // console.log('cleared chainlink interval that decreases opacity')
+            return
+          }
+        }
+      })
+    }, 16);
+  }
+  
   let dx;
   let dy;
   if(e) {
@@ -505,8 +524,6 @@ function moveCanvas(e, offset) {
   fctx.translate(dx * fgTransMult,  dy * fgTransMult)
   f2ctx.translate(dx * fg2TransMult,  dy * fg2TransMult)
 
-  // titctx.translate(dx * titTransMult,  dy * titTransMult)
-  
   globalTranslate.x += dx
   globalTranslate.y += dy
 
@@ -526,8 +543,16 @@ function draw(currentTimestamp) {
   var dt = (currentTimestamp - lastTimestamp)/1000
   var fps = 1/dt
   lastTimestamp = currentTimestamp
-  mainTimer++
-  if(mainTimer > mainTimerMax) mainTimer = 0
+
+  timers.forEach(timer=> {
+    // if(timer == mainTimer) {
+      timer[0]++
+      if(timer[0] > timer[1]) timer[0] = 0
+    // }
+    // if(timer == movedTimer) {
+      // timer[0]++
+    // }
+  })
 
   clearCtx(bctx,bgTransMult)
   clearCtx(b2ctx,bg2TransMult)
@@ -541,6 +566,16 @@ function draw(currentTimestamp) {
 
 
   // update
+
+  images.forEach(img=> {
+    if(!img.chainlink) return
+    img.opacity = (Math.sin((movedTimer[0]/movedTimer[1]*PI*5)) + 1)/2
+    if(chainlinksInvisibleTimer <= 0) {
+      img.maxOpacity = clamp(img.maxOpacity + 0.002,0,1)
+    }
+  })
+
+  chainlinksInvisibleTimer = Math.max(chainlinksInvisibleTimer - 1,0)
 
   hints.forEach(hint=> {
     hint.update()
@@ -569,17 +604,15 @@ function draw(currentTimestamp) {
   else {
     scrollVelocity = 0
   }
-  // if(Math.hypot(mouseTravel.x,mouseTravel.y) > 100) shakeCamera(20,1500)
+
   //update center of screen for tctx
   center.x = -globalTranslate.x + cw/2
   center.y = -globalTranslate.y + ch/2
     
-  if(mainTimer == mainTimerMax) {
+  if(mainTimer[0] == mainTimer[1]) {
     populateBorderCells()
   }
-  // images.forEach(img=> {
-  //   img.animate()
-  // })
+
   particleGens.forEach(gen => {
     gen.update()
   })
@@ -587,12 +620,12 @@ function draw(currentTimestamp) {
     particle.update()
   })
   mouseGlow.update()
-  // mouseTitleGlow.update()
+
   localStorage.setItem('globalTranslateX', globalTranslate.x)
   localStorage.setItem('globalTranslateY', globalTranslate.y)
 
   //cleanup
-  if(mainTimer == mainTimerMax) {
+  if(mainTimer[0] == mainTimer[1]) {
     particles.forEach((particle,index)=> {
       if(particle.dead) particles.splice(index,1)
     })
@@ -949,21 +982,23 @@ class Hint {
 }
 
 class TextObject {
-  constructor(text,ctx,mult, id = Math.floor(Math.random()*1_000_000_000),font = undefined) {
+  constructor(x,y,text,ctx,mult, id = Math.floor(Math.random()*1_000_000_000),font = undefined) {
     this.id = id
-    this.x = text[0][0]
-    this.y = text[0][1]
+    // this.x = text[0][0]
+    // this.y = text[0][1]
+    this.x = x
+    this.y = y
     this.hidden = false
-    if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
-      this.x = +localStorage.getItem(`${this.id} x`)
-      this.y = +localStorage.getItem(`${this.id} y`)
-    }
-    if(localStorage.getItem(`${this.id} hidden`) == 'false') {
-      this.hidden = false
-    }
-    else if(localStorage.getItem(`${this.id} hidden`) == 'true') {
-      this.hidden = true
-    }
+    // if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
+    //   this.x = +localStorage.getItem(`${this.id} x`)
+    //   this.y = +localStorage.getItem(`${this.id} y`)
+    // }
+    // if(localStorage.getItem(`${this.id} hidden`) == 'false') {
+    //   this.hidden = false
+    // }
+    // else if(localStorage.getItem(`${this.id} hidden`) == 'true') {
+    //   this.hidden = true
+    // }
     
     this.text = text
     this.ctx = ctx
@@ -1062,7 +1097,8 @@ class Img {
       currentFrameNum: 0,
       framesTotal: 0,
     },
-    filter = null
+    filter = null,
+    chainlink = false
     ) {
     this.id = id
     this.dimX = dimX
@@ -1070,20 +1106,20 @@ class Img {
     this.x = x
     this.y = y
     this.hidden = false
-    if(localStorage.getItem(`${this.id} dimX`) || localStorage.getItem(`${this.id} dimY`)) {
-      this.dimX = +localStorage.getItem(`${this.id} dimX`)
-      this.dimY = +localStorage.getItem(`${this.id} dimY`)
-    }
-    if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
-      this.x = +localStorage.getItem(`${this.id} x`)
-      this.y = +localStorage.getItem(`${this.id} y`)
-    }
-    if(localStorage.getItem(`${this.id} hidden`) == 'false') {
-      this.hidden = false
-    }
-    else if(localStorage.getItem(`${this.id} hidden`) == 'true') {
-      this.hidden = true
-    }
+    // if(localStorage.getItem(`${this.id} dimX`) || localStorage.getItem(`${this.id} dimY`)) {
+    //   this.dimX = +localStorage.getItem(`${this.id} dimX`)
+    //   this.dimY = +localStorage.getItem(`${this.id} dimY`)
+    // }
+    // if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
+    //   this.x = +localStorage.getItem(`${this.id} x`)
+    //   this.y = +localStorage.getItem(`${this.id} y`)
+    // }
+    // if(localStorage.getItem(`${this.id} hidden`) == 'false') {
+    //   this.hidden = false
+    // }
+    // else if(localStorage.getItem(`${this.id} hidden`) == 'true') {
+    //   this.hidden = true
+    // }
     this.rotation = rotation * PI/180 // provide this in deg, convert to radians here
     this.src = src
     this.img = new Image()
@@ -1098,6 +1134,7 @@ class Img {
     this.ctx = ctx
     this.mult = mult
     this.maxOpacity = maxOpacity
+    this.opacity = maxOpacity
     this.instanceOf = instanceOf
     this.glowUnderCursor = glowUnderCursor
     this.visible = false
@@ -1117,6 +1154,7 @@ class Img {
     })
     this.animated = animated
     this.filter = filter
+    this.chainlink = chainlink
     this.objectType = "img"
     objects.push(this)
     initialValues.push({
@@ -1139,8 +1177,6 @@ class Img {
       var curFrame = animData.curFrame
       var nextFrame = animData.nextFrame
     }
-
-
     this.ctx.save()
 
     let dist = Math.hypot(
@@ -1183,7 +1219,6 @@ class Img {
       }
       this.ctx.globalCompositeOperation = 'source-atop'
     }
-
     if(darken > 0) {
       this.ctx.filter = `brightness(${Math.min(0.5 + darken,1)})`
     }
@@ -1210,18 +1245,17 @@ class Img {
       else this.ctx.filter = 'brightness(1.5)'
     }
     if(this.filter) this.ctx.filter = this.filter
-    //animation
+
+    //draw the actual image
     this.ctx.save()
-    //if not animated
     if(!this.animated) {
-      this.ctx.globalAlpha = this.maxOpacity
+      this.ctx.globalAlpha = this.opacity*this.maxOpacity
       this.ctx.drawImage(this.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
     }
-    // if animated
     if(this.animated) {
-      this.ctx.globalAlpha = curFrame.opacity
+      this.ctx.globalAlpha = curFrame.opacity*this.maxOpacity
       this.ctx.drawImage(curFrame.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
-      this.ctx.globalAlpha = nextFrame.opacity
+      this.ctx.globalAlpha = nextFrame.opacity * this.maxOpacity
       this.ctx.drawImage(nextFrame.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
 
       // console.log(this.animation.frames[this.animation.currentFrameNum].opacity)
@@ -1239,7 +1273,6 @@ class Img {
     if(this.glowUnderCursor) {
       this.ctx.restore()
     }
-
     if((matchedObject == this && pressedShift) || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.restore()
     }
@@ -1251,7 +1284,6 @@ class Img {
       this.ctx.restore()
     }
     if(debug) {
-      
       this.ctx.fillStyle = 'white'
       this.ctx.font = '14px Arial'
       this.ctx.fillText(`Filter set to: ${Math.min(0.5 + darken,1)}`,this.x,this.y - lineHeight*2 * 0.8)
@@ -1264,7 +1296,6 @@ class Img {
         1
         ),0)}`, this.x, this.y - lineHeight*4 * 0.8)
     }
-    
     this.ctx.restore()
   }
   animate() {
@@ -1354,176 +1385,39 @@ let mouseGlowProperties = {
 let mouseGlow = new MouseGlow(0, 0,mouseGlowProperties.radius,tctx, tTransMult)
 let images = []
 
-images.push(new Img(900, 1000, 800, 800, 0, imgSources['s1_gray_vale'].src,m2ctx,mg2TransMult, 'vale',1,undefined,undefined,false,true,
-{
-  frameDuration: 120, //in frames because fuck you
-  frameProgress: 0,
-  frames: [
-    {
-      src: imgSources['s1_gray_vale'].src,
-      opacity: 1
-    },
-    {
-      src: imgSources['s1_gray_vale'].src,
-      opacity: 0
-    },
-  ]
-}))
-images.push(new Img(900, 1000, 800, 800, 0, imgSources['s1_debris1'].src,mctx,mgTransMult, 'valedebris'))
-images.push(new Img(861, 944, 800, 800, 0, imgSources['s1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
-images.push(new Img(376, 561, 150, 150, 0, imgSources['small_planet_saturn'].src,bctx,bgTransMult, 'saturn'))
-
-images.push(new Img(1660, 1597, 700, 700,0, imgSources['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-images.push(new Img(1667 , 1474, 700, 700,0, imgSources['cloud_small_1'].src,mctx,mgTransMult, 'clouds1',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-images.push(new Img(1639, 1494, 700, 700,0, imgSources['cloud_small_2'].src,mctx,mgTransMult, 'clouds2',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-
-
-
-// images.push(new Img(949, 1546, 1000, 1000,0, imgSources['s3_no_stir'].src,mctx,mgTransMult, 's3nostir'))
-
-images.push(new Img(1401, 2013, 1024, 1024,0, imgSources['s4_grass_bg'].src,mctx,mgTransMult, 's4grassbg'))
-images.push(new Img(1427, 2162, 1024, 1024,0, imgSources['s4_grass_fg'].src,m2ctx,mg2TransMult, 's4grassfg'))
-images.push(new Img(1462, 2248, 1024, 1024,0, imgSources['s4_grass_fg2'].src,tctx,tTransMult, 's4grassfg2'))
-// images.push(new Img(1409, 2038, 1200, 1200,0, imgSources['s4_grass_bg'].src,m2ctx,mg2TransMult, 's4grassfg2')) // just placeholder for more grass
-
-images.push(new Img(1698, 224, 90, 90, 0, imgSources['small_asteroid_1'].src,fctx,fgTransMult, 'ast1'))
-images.push(new Img(427, 1062, 90, 90, 0, imgSources['small_asteroid_1'].src,f2ctx,fg2TransMult, 'ast1i2'))
-images.push(new Img(2248, 780, 120, 120, 0, imgSources['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2'))
-images.push(new Img(3395, 2021, 120, 120, 0, imgSources['small_asteroid_2_rot2'].src,f2ctx,fg2TransMult, 'ast2i2'))
-images.push(new Img(2995 ,3494 ,120, 120, 0, imgSources['small_asteroid_2'].src,f2ctx,fg2TransMult, 'ast2i3'))
-// images.push(new Img(1395, 361, 90, 90, 0, imgSources['small_moon_1'].src,bctx,bgTransMult, 'moon1'))
-
-//stanza 5
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_bg'].src,b2ctx,bg2TransMult, 's5reedsbg'))
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_mg'].src,m2ctx,mg2TransMult, 's5reedsmg'))
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_naiad_watery'].src,b2ctx,bg2TransMult, 's5naiad'))
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_water_shadow'].src,mctx,mgTransMult, 's5watershadow'))
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_fg'].src,tctx,tTransMult, 's5reedsfg'))
-//stanza 6
-images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand_fill_frame1'].src,mctx,mgTransMult, 's6sand_fill',1,undefined,undefined,false,true,
-{
-  frameDuration: 120, //in frames because fuck you
-  frameProgress: 0,
-  frames: [
-    {
-      src: imgSources['s6_margin_sand_fill_frame1'].src,
-      opacity: 1
-    },
-    {
-      src: imgSources['s6_margin_sand_fill_frame2'].src,
-      opacity: 0
-    },
-    {
-      src: imgSources['s6_margin_sand_fill_frame3'].src,
-      opacity: 0
-    },
-  ]
-}
-))
-// images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand'].src,mctx,mgTransMult, 's6sand'))
-images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand_frame1'].src,mctx,mgTransMult, 's6sand',undefined,undefined,false,false,true,
-{
-  frameDuration: 120, //in frames because fuck you
-  frameProgress: 0,
-  frames: [
-    {
-      src: imgSources['s6_margin_sand_frame1'].src,
-      opacity: 1
-    },
-    {
-      src: imgSources['s6_margin_sand_frame2'].src,
-      opacity: 0
-    },
-  ]
-}
-))
-
-images.push(new Img(1395, 2500, 70, 70, 0, imgSources['s6_moon'].src,mctx,mgTransMult, 's6moon',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-
-//stanza 7
-images.push(new Img(1820, 4000, 700, 700, 0, imgSources['s7_unsceptered'].src,m2ctx,mg2TransMult, 's7unsceptered',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-//stanza 8
-images.push(new Img(1820, 2000, 750, 750, 0, imgSources['s8_no_force'].src,m2ctx,mg2TransMult, 's8noforce',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-//stanza 9
-images.push(new Img(1820, 4000, 800, 800, 0, imgSources['s9_wheel'].src,m2ctx,mg2TransMult, 's9wheel',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-images.push(new Img(1820, 4000, 372, 282, 0, imgSources['s9_cloud_small_1'].src,mctx,mgTransMult, 's9clouds1',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-images.push(new Img(1820, 4000, 223, 158, 0, imgSources['s9_cloud_small_2'].src,mctx,mgTransMult, 's9clouds2',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-//stanza 10
-images.push(new Img(1820, 7000, 800, 800, 0, imgSources['s10_sphinx'].src,mctx,mgTransMult, 's10sphinx',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-//stanza 11
-images.push(new Img(1820, 4000, 800, 800, 0, imgSources['s11_sorrow'].src,mctx,mgTransMult, 's11sorrow',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-images.push(new Img(1820, 7000, 800, 800, 0, imgSources['s11_sorrow_clouds'].src,m2ctx,mg2TransMult, 's11sorrowclouds',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-images.push(new Img(448, 7269, 122, 131, 0, imgSources['cloud_small_3'].src,b2ctx,bg2TransMult, 'clouds3',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-images.push(new Img(448, 7269, 238, 161, 0, imgSources['cloud_small_4'].src,mctx,mgTransMult, 'clouds4',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
-//stanza 12
-images.push(new Img(1820, 4000, 256, 256, 0, imgSources['s12_thunder_small1'].src,mctx,mgTransMult, 's12tsmall1'))
-images.push(new Img(1820, 4000, 512, 512, 0, imgSources['s12_thunder_small2'].src,mctx,mgTransMult, 's12tsmall2'))
-images.push(new Img(1820, 4000, 1024, 1024, 0, imgSources['s12_thunder_large1'].src,m2ctx,mg2TransMult, 's12tlarge1',0.5))
-//stanza 13
-images.push(new Img(1820, 8000, 1024, 1024, 0, imgSources['s13_pressed_her_hand'].src,m2ctx,mg2TransMult, 's13pressedhand'))
-
-
-// images.push(new Img(1820, 1199, 90, 90, 0, imgSources['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
-// images.push(new Img(259, 1762, 120, 120, 0, imgSources['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
-
-// images.push(new Img(929, 3696, 520, 235, 0, imgSources['s8_bg_grass'].src,mctx,mgTransMult, 'bggrass'))
-// images.push(new Img(1172, 4144, 800, 230, 0, imgSources['s8_fg_grass'].src,m2ctx,mg2TransMult, 'fggrass'))
-// images.push(new Img(1620, 3523, 680, 665, 0, imgSources['s8_waterfall'].src,mctx,mgTransMult, 'waterfall'))
-
-
-
-
 let textObjects = []
 let poemState = 0
 
-function createTitle() {
-  textObjects.push(new TextObject(
-    [
-      [-50,-100],
-      `John Keats`
-    ],
-    tctx,
-    tTransMult,
-    'text_author',
-    '40px andada'
-  ))
-  textObjects.push(new TextObject(
-    [
-      [-50,-50],
-      `Hyperion, Book I`
-    ],
-    tctx,
-    tTransMult,
-    'poem_title',
-    '80px andada'
-  ))
-}
+// function createTitle() {
+//   textObjects.push(new TextObject(
+//     [
+//       [-50,-100],
+//       `John Keats`
+//     ],
+//     tctx,
+//     tTransMult,
+//     'text_author',
+//     '40px andada'
+//   ))
+//   textObjects.push(new TextObject(
+//     [
+//       [-50,-50],
+//       `Hyperion, Book I`
+//     ],
+//     tctx,
+//     tTransMult,
+//     'poem_title',
+//     '80px andada'
+//   ))
+// }
 
-createTitle()
+// createTitle()
 
-function advancePoem() {
-  let keys = Object.keys(poem)
-  textObjects.push(new TextObject(poem[keys[poemState]],tctx,tTransMult,`s${poemState + 1}`))
-  poemState++
-}
-
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
-advancePoem()
+// function advancePoem() {
+//   let keys = Object.keys(poem)
+//   textObjects.push(new TextObject(poem[keys[poemState]],tctx,tTransMult,`s${poemState + 1}`))
+//   poemState++
+// }
 
 class Chain {
   constructor(origin,linkCount,linkAngle) {
@@ -1536,13 +1430,6 @@ class Chain {
 
   }
 }
-
-let link = new Image()
-link.src = 'assets/chainlink_circle_large.png'
-let link2 = new Image()
-link2.src = 'assets/chainlink_circle_small.png'
-images.push(new Img(923, 618, 64, 64, 0, link.src, m2ctx, mg2TransMult, 'chaintest', 0.8))
-images.push(new Img(952, 695, 64, 64, 0, link2.src, m2ctx, mg2TransMult, 'chaintest2', 0.8))
 
 
 let particles = [];
@@ -1703,28 +1590,6 @@ class ParticleGenerator {
 }
 
 let particleGens = [];
-
-
-particleGenerators.forEach(gen=> {
-  let parent = objects.filter(obj => obj.id == gen.parent).shift()
-  if(!parent) return
-  if(parent.hidden) return
-  particleGens.push(new ParticleGenerator(
-    parent,
-    gen.offset,
-    gen.spawnRate,
-    gen.spawnChance,
-    gen.spawnRange,
-    gen.color,
-    gen.lifeMin,
-    gen.lifeMax,
-    gen.force,
-    gen.velRange,
-    parent.ctx,
-    parent.mult,
-  ))
-})
-
 let records = [];
 
 function viewChanges() {
@@ -1954,7 +1819,24 @@ let objectHistory = []
 
 function duplicateObject(obj) {
   if(obj instanceof Img) {
-    var img = new Img(obj.x,obj.y,obj.dimX,obj.dimY,obj.rotation,obj.img.src,obj.ctx,obj.mult,obj.id + Math.floor(Math.random()*1_000_000_000),obj.maxOpacity,obj.id)
+    var img = new Img(
+      obj.x,
+      obj.y,
+      obj.dimX,
+      obj.dimY,
+      obj.rotation,
+      obj.img.src,
+      obj.ctx,
+      obj.mult,
+      obj.id + Math.floor(Math.random()*1_000_000_000),
+      obj.maxOpacity,
+      obj.id,
+      obj.glowUnderCursor,
+      obj.shadowSrc,
+      obj.animated,
+      obj.animation,
+      obj.filter,
+      obj.chainlink)
 
     if(obj.instanceOf) {
       img.id = obj.instanceOf + Math.floor(Math.random()*1_000_000_000)
@@ -1983,6 +1865,13 @@ function undo() {
   }
 }
 
+function deleteObject(deleted) {
+  if(deleted.objectType == 'img') images = images.filter(img=> img != deleted)
+  if(deleted.objectType == 'textObject') textObjects = textObjects.filter(textobj=> textobj != deleted)
+  objects = objects.filter(obj=> obj != deleted)
+}
+
+
 function shakeCamera(amount,duration) {
   clearInterval(cameraShakeInterval)
   cameraShakeInterval = setInterval(() => {
@@ -1996,12 +1885,7 @@ function shakeCamera(amount,duration) {
   }, duration);
 }
 
-
 function init() {
-  // moveCanvas(undefined,{
-  //   x: cw/2 - poem['stanza1'][0][0] - 180,
-  //   y: ch/2 - poem['stanza1'][0][1] - 80,
-  // })
   if(controlsVisible) {
     showControls()
   }
@@ -2013,14 +1897,15 @@ function init() {
   initGrid().then(setTimeout(()=>{hideTitleScreen()},1000), console.log('failed to init grid'))
   
   //hints
-  userUnderstand.hintMovement = setTimeout(()=> {
+  userUnderstand.hintMovement = setInterval(()=> {
     if(hints.length == 0) hints.push(new Hint('Use your mouse to drag around..','white', undefined, 'movement'))
   },1000 * 8)
   
-  userUnderstand.hintScroll = setTimeout(()=> {
+  userUnderstand.hintScroll = setInterval(()=> {
    if(hints.length == 0) hints.push(new Hint('You can also scroll with your mouse...','white', undefined, 'scroll'))
-  },1000 * 16)
+  },1000 * 9)
 
+  readObjectData()
 }
 
 function drawDebugInfo(fps,) {
@@ -2083,28 +1968,6 @@ function loadAudio(target,src,section) {
     // event that does something
   }
 }
-
-//init code
-
-// let object_data;
-// readTextFile("object_data.json", function(text){
-//   object_data = JSON.parse(text);
-//   object_data.forEach(data=> {
-//     if(data.objectType == 'textObject') {
-
-//     }
-//     // objects.push(new TextObject(data.text,data.ctx,data.mult,data.id))
-//     if(data.objectType == 'img') {
-//       let imgSrc = imgSources[data.id]
-//       let ctx = 
-//       let img = new Img(data.x,data.y,data.dimX,data.dimY,data.rotation,data.src,data.ctx,data.mult,data.id,data.maxOpacity,data.instanceOf,data.glowUnderCursor,data.shadowSrc)
-//       images.push(img)
-//       objects.push(img)
-//     }
-//   })
-// });
-
-
 
 init()
 draw()
