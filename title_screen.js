@@ -1,5 +1,5 @@
-let canvasTitle = document.querySelector('#canvas-title')
-const titctx = canvasTitle.getContext('2d')
+// let canvasTitle = document.querySelector('#canvas-title')
+// const titctx = canvasTitle.getContext('2d')
 
 let titleScreen = document.querySelector('.title-screen')
 function hideTitleScreen() {

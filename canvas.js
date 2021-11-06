@@ -1,5 +1,5 @@
 let debug = false;
-let controlsVisible = true;
+let controlsVisible = false;
 let graphics = 'medium';
 let userInteracted = false;
 let audioOn = false;
@@ -8,9 +8,17 @@ let isTitleVisible = true;
 let isTitleFading = false;
 const PI = Math.PI
 
+const userUnderstand = {
+  movement: false,
+  scroll: false,
+  hintMovement: null,
+  hintScroll: null,
+}
+
 let cameraShakeInterval = null;
 
 let scrollVelocity = 0
+let scrollFriction = 0.08
 let mainTimer = 0
 let mainTimerMax = 60;
 
@@ -51,6 +59,8 @@ let hideObjectBtn = document.querySelector('#hide-object-btn')
 hideObjectBtn.addEventListener('click', function() {
   if(selected) selected.forEach(obj=> obj.hidden = !obj.hidden)
 })
+let hintContainer = document.querySelector('#hint-overlay')
+
 
 let objects = []; //all complexi-er objects will be there
 let initialValues = [];
@@ -81,10 +91,10 @@ let tTransMult = 1
 let fgTransMult = 1.5
 let fg2TransMult = 2.2
 
-let titTransMult = 1
+// let titTransMult = 1
 
 let contexts = []
-contexts.push(bctx,b2ctx,mctx,m2ctx,tctx,fctx,f2ctx,titctx)
+contexts.push(bctx,b2ctx,mctx,m2ctx,tctx,fctx,f2ctx)
 let mults = []
 mults.push(bgTransMult,
   bg2TransMult,
@@ -93,12 +103,11 @@ mults.push(bgTransMult,
   tTransMult,
   fgTransMult,
   fg2TransMult,
-  titTransMult
 )
 
 
 let canvases = []
-canvases.push(canvasBg,canvasBg2,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2,canvasTitle)
+canvases.push(canvasBg,canvasBg2,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2)
 canvases.forEach(canvas => {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
@@ -116,25 +125,14 @@ window.onresize = () => {
   let prevCh = ch
   cw = window.innerWidth
   ch = window.innerHeight
-
   canvases.forEach(canvas => {
     canvas.width = cw
     canvas.height = ch
   })
-  // moveCanvas(undefined,{
-  //   x: cw/2 - poem['stanza1'][0][0] - 180,
-  //   y: ch/2 - poem['stanza1'][0][1] - 80,
-  // })
-
   moveCanvas(undefined,{
     x: globalTransPrev.x,
     y: globalTransPrev.y,
   })
-  // moveCanvas(undefined,{
-  //   x: 0 - (cw - prevCw),
-  //   y: 0 - (ch - prevCh),
-  // })
-
 }
 
 //input related variables
@@ -156,7 +154,6 @@ let mouseTravel = {
   y: 0,
 }
 let mouseParticleEffectRadius = 128;
-
 let changingXforSelected = false
 let changingYforSelected = false
 let changingRotforSelected = false
@@ -178,7 +175,6 @@ let dragMultiplier = 1
 let textColor = 'hsl(0,0%,98%)'
 let lineHeight = 35
 let mainfont;
-
 
 
 //load content 
@@ -274,6 +270,7 @@ document.addEventListener('wheel', processWheelEvents, {passive: true})
 
 function processWheelEvents(e) { //scroll event listener
   if(e.deltaY < 0 && !pressedCtrl && !pressedShift) {
+    dismissHint('scroll')
     scrollVelocity += 3
     setTimeout(() => {
       scrollVelocity += 4
@@ -283,6 +280,7 @@ function processWheelEvents(e) { //scroll event listener
     }, 40);
   }
   if(e.deltaY > 0 && !pressedCtrl && !pressedShift) {
+    dismissHint('scroll')
     scrollVelocity -= 3
     setTimeout(() => {
       scrollVelocity -= 4
@@ -346,7 +344,7 @@ function moveObject(e) {
 
   if(movingChangelog) {
     changelogContainer.style.left = Math.max(Math.min(e.clientX - 12,cw - 300), 0) + 'px'
-    changelogContainer.style.top = Math.max(Math.min(e.clientY - 12,ch - 30), 0) + 'px'
+    changelogContainer.style.top = Math.max(Math.min(e.clientY - 12,ch - 35), 0) + 'px'
   }
 
   mouseNow = {
@@ -369,15 +367,31 @@ document.addEventListener('mousemove', function(e) {
   }
   
   if(movingCanvas) {
+    dismissHint('movement')
     moveCanvas(e)
   }
   mouseNow = {
     x: e.clientX,
     y: e.clientY,
   }
-
+  
 },false)
 
+function dismissHint(forWhat) {
+  if(forWhat == 'movement') {
+    userUnderstand.movement = true
+    clearTimeout(userUnderstand.hintMovement)
+    let filtered = hints.filter(hint=> hint.forWhat == 'movement')
+    if(filtered.length > 0) filtered.forEach(hint=> hint.dismissed = true)
+  }
+  else
+  if(forWhat == 'scroll') {
+    userUnderstand.scroll = true
+    clearTimeout(userUnderstand.hintScroll)
+    let filtered = hints.filter(hint=> hint.forWhat == 'scroll')
+    if(filtered.length > 0) filtered.forEach(hint=> hint.dismissed = true)
+  }
+}
 changelogHandle.addEventListener('mousedown', function(e) {
   mousedown = true
   movingChangelog = true
@@ -469,6 +483,8 @@ document.addEventListener('mouseup', function (e) {
 // },false)
 
 function moveCanvas(e, offset) {
+
+
   let dx;
   let dy;
   if(e) {
@@ -489,7 +505,7 @@ function moveCanvas(e, offset) {
   fctx.translate(dx * fgTransMult,  dy * fgTransMult)
   f2ctx.translate(dx * fg2TransMult,  dy * fg2TransMult)
 
-  titctx.translate(dx * titTransMult,  dy * titTransMult)
+  // titctx.translate(dx * titTransMult,  dy * titTransMult)
   
   globalTranslate.x += dx
   globalTranslate.y += dy
@@ -513,19 +529,22 @@ function draw(currentTimestamp) {
   mainTimer++
   if(mainTimer > mainTimerMax) mainTimer = 0
 
-  // clearCtx(bctx,bgTransMult)
+  clearCtx(bctx,bgTransMult)
   clearCtx(b2ctx,bg2TransMult)
   clearCtx(mctx,mgTransMult)
   clearCtx(m2ctx,mg2TransMult)
   clearCtx(tctx,tTransMult)
   clearCtx(fctx,fgTransMult)
   clearCtx(f2ctx,fg2TransMult)
-  clearCtx(titctx,titTransMult)
+
+  //hints
 
 
   // update
 
-
+  hints.forEach(hint=> {
+    hint.update()
+  })
 
   mouseStates.push(mouseNow)
   if(mouseStates.length > 1) {
@@ -542,7 +561,7 @@ function draw(currentTimestamp) {
 
   if(Math.abs(scrollVelocity) > 0.02) {
     moveCanvas(undefined,{x:0, y:Math.round(scrollVelocity)})
-    scrollVelocity *= 0.9
+    scrollVelocity *= 1 - scrollFriction
   }
   else if(Math.abs(scrollVelocity) < 0.02 && Math.abs(scrollVelocity) > 0 ) {
     scrollVelocity = 0
@@ -550,7 +569,7 @@ function draw(currentTimestamp) {
   else {
     scrollVelocity = 0
   }
-  // if(Math.hypot(mouseTravel.x,mouseTravel.y) > 1000) shakeCamera(20,500)
+  // if(Math.hypot(mouseTravel.x,mouseTravel.y) > 100) shakeCamera(20,1500)
   //update center of screen for tctx
   center.x = -globalTranslate.x + cw/2
   center.y = -globalTranslate.y + ch/2
@@ -568,7 +587,7 @@ function draw(currentTimestamp) {
     particle.update()
   })
   mouseGlow.update()
-  mouseTitleGlow.update()
+  // mouseTitleGlow.update()
   localStorage.setItem('globalTranslateX', globalTranslate.x)
   localStorage.setItem('globalTranslateY', globalTranslate.y)
 
@@ -626,15 +645,8 @@ function draw(currentTimestamp) {
       }
   })
 
-  // contexts.forEach((ctx,index)=> {
-  //   ctx.strokeStyle = 'red'
-  //   ctx.strokeRect(-globalTranslate.x*mults[index],-globalTranslate.y*mults[index],cw,ch)
-  // })
-  if((isTitleVisible || isTitleFading) && mouseTitleGlow) {
-    mouseTitleGlow.draw()
-  }
   
-  if(mouseGlow && (isTitleFading || !isTitleVisible)) mouseGlow.draw()
+  if(mouseGlow) mouseGlow.draw()
   
 
   drawParticles()
@@ -783,11 +795,15 @@ function generateStar(cell) {
 let vpOffset = {x:0,y:0}
 let vpOffsetPrev = vpOffset
 
-function populateBorderCells() {
+function calcVpOffset() {
   vpOffset = {
     x: Math.floor(-globalTranslate.x / stargrid.cellsize * bgTransMult),
     y: Math.floor(-globalTranslate.y / stargrid.cellsize * bgTransMult),
   }
+}
+
+function populateBorderCells() {
+  calcVpOffset()
   
   if(vpOffset.x == vpOffsetPrev.x && vpOffset.y == vpOffsetPrev.y) {
     return
@@ -802,35 +818,7 @@ function populateBorderCells() {
       num += add
     }
   }
-  // console.log(`Added ${num} new cells to the grid.`)
   
-
-  // let unpopulated = gridcells.filter(
-  //   cell => 
-  //   (
-  //   ( 
-  //     cell.x <= vpOffset.x + 1 && 
-  //     cell.x >= vpOffset.x - 2
-  //   )
-  //   ||
-  //   (
-  //     cell.x >= vpOffset.x + cw/stargrid.cellsize - 1 &&
-  //     cell.x <= vpOffset.x + cw/stargrid.cellsize + 2
-  //   )
-  //   ||
-  //   ( 
-  //     cell.y <= vpOffset.y + 1 && 
-  //     cell.y >= vpOffset.y - 2
-  //   )
-  //   ||
-  //   (
-  //     cell.y >= vpOffset.y + ch/stargrid.cellsize - 1 &&
-  //     cell.y <= vpOffset.y + ch/stargrid.cellsize + 2
-  //   )
-  //   )
-  //   &&
-  //   cell.populated == false
-  // )
   let unpopulated = gridcells.filter(
     cell =>
     (
@@ -845,7 +833,7 @@ function populateBorderCells() {
     &&
     cell.populated == false
   )
-
+  console.log(unpopulated.length)
   unpopulated.forEach(cell => {
     populateCell(cell)
   })
@@ -866,18 +854,16 @@ function deleteFarCells() {
     )
   )
   let starsDeleted = 0
-  farcells.forEach(cell => cell.delete = true)
-  gridcells.forEach((cell,cindex)=> {
+
+  farcells.forEach(farcell => farcell.delete = true);
+
+  gridcells.forEach((cell)=> {
     if(cell.delete) {
-      stars.forEach((star,sindex)=> {
-        if(star.parent == cell) {
-          stars.splice(sindex,1)
-          starsDeleted++
-        }
-      })
-      gridcells.splice(cindex,1)
+      stars = stars.filter(star => star.parent != cell)
     }
   })
+  gridcells = gridcells.filter(cell=> !cell.delete)
+
   if(debug && farcells.length > 0) {
     // console.log(`Cells deleted: ${farcells.length}`)
     // console.log(`Stars deleted: ${starsDeleted}`)
@@ -903,9 +889,9 @@ function generateCell(x,y) {
 }
 
 
-function initGrid() {
-  for (let x = -2; x < window.innerWidth / stargrid.cellsize + 2 ; x++) {
-    for (let y = -2; y < window.innerHeight / stargrid.cellsize + 2 ; y++) {
+async function initGrid() {
+  for (let x = vpOffset.x - 2; x < window.innerWidth / stargrid.cellsize + 2 ; x++) {
+    for (let y = vpOffset.y - 2; y < window.innerHeight / stargrid.cellsize + 2 ; y++) {
       gridcells.push(new Gridcell(x,y))
     }
   }
@@ -919,6 +905,7 @@ function initGrid() {
   visible.forEach(cell=> {
     populateCell(cell)
   })
+  return true
 }
 
 function populateCell(cell = null) {
@@ -927,12 +914,42 @@ function populateCell(cell = null) {
     generateStar(cell)
   }
   cell.populated = true
-
 }
 
+let hints = [];
+class Hint {
+  constructor(text,colorText,colorBg = null,forWhat) {
+    this.text = text
+    this.colorText = colorText
+    this.colorBg = colorBg
+    this.dismissed = false
+    this.forWhat = forWhat
+    this.life = 100
+
+    this.element = document.createElement('div'); 
+    let hintCont = this.element;
+    let hint = document.createElement('div')
+    hintCont.classList.add('hint-container','anim-pulse')
+    hint.classList.add('hint')
+    hint.innerHTML = this.text
+    hint.style.color = this.colorText
+    if(this.colorBg) hint.style.backgroundColor = this.colorBg
+    hintCont.append(hint)
+    hintContainer.append(hintCont)
+  }
+  update() {
+    if(!this.dismissed) return
+    this.life--
+    this.element.childNodes[0].style.opacity = this.life/100
+    if(this.life <= 0) {
+      this.element.parentElement.removeChild(this.element)
+      hints = hints.filter(hint => hint != this)
+    }
+  }
+}
 
 class TextObject {
-  constructor(text,ctx,mult, id = Math.floor(Math.random()*1_000_000_000)) {
+  constructor(text,ctx,mult, id = Math.floor(Math.random()*1_000_000_000),font = undefined) {
     this.id = id
     this.x = text[0][0]
     this.y = text[0][1]
@@ -951,6 +968,7 @@ class TextObject {
     this.text = text
     this.ctx = ctx
     this.mult = mult
+    this.font = font
     this.visible = false;
     this.selected = false
     this.objectType = "textObject"
@@ -975,7 +993,7 @@ class TextObject {
       this.ctx.globalAlpha = 0
     }
 
-    if((matchedObject == this && pressedShift)  /* || (pressedCtrl) */ || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
+    if((matchedObject == this && pressedShift) || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.save()
       if(pressedCtrl) this.ctx.strokeStyle = 'white'
       else this.ctx.strokeStyle = 'blue'
@@ -995,12 +1013,12 @@ class TextObject {
       }
       
     this.ctx.fillStyle = textColor
-    this.ctx.font = mainfont
+    this.ctx.font = this.font || mainfont
     for (let i = 1; i < this.text.length; i++) {
       this.ctx.fillText(this.text[i],this.x,this.y + lineHeight*i - lineHeight)
     }
 
-    if(matchedObject == this && pressedShift /* || (pressedCtrl)  */|| (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
+    if(matchedObject == this && pressedShift || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.restore()
     }
 
@@ -1025,18 +1043,26 @@ class TextObject {
 
 class Img {
   constructor(
-    x,y,dimX,dimY,rotation = 0,
+    x,y,
+    dimX,dimY,
+    rotation = 0,
     src, 
     ctx, mult, 
     id = Math.floor(Math.random()*1_000_000_000), 
-    maxOpacity = 1, instanceOf = undefined, glowUnderCursor = false, shadowSrc = false, animated = false, animation = {
+    maxOpacity = 1, 
+    instanceOf = undefined, 
+    glowUnderCursor = false, 
+    shadowSrc = false, 
+    animated = false, 
+    animation = {
       frames: [],
       frameDuration: 60,
       frameProgress: 0,
       playing: false,
       currentFrameNum: 0,
       framesTotal: 0,
-    }
+    },
+    filter = null
     ) {
     this.id = id
     this.dimX = dimX
@@ -1059,6 +1085,7 @@ class Img {
       this.hidden = true
     }
     this.rotation = rotation * PI/180 // provide this in deg, convert to radians here
+    this.src = src
     this.img = new Image()
     this.img.src = src
     if(shadowSrc) {
@@ -1088,8 +1115,8 @@ class Img {
       frame.img = new Image()
       frame.img.src = animation.frames[index].src
     })
-
     this.animated = animated
+    this.filter = filter
     this.objectType = "img"
     objects.push(this)
     initialValues.push({
@@ -1182,7 +1209,7 @@ class Img {
       if(pressedCtrl) this.ctx.filter = ''
       else this.ctx.filter = 'brightness(1.5)'
     }
-
+    if(this.filter) this.ctx.filter = this.filter
     //animation
     this.ctx.save()
     //if not animated
@@ -1237,7 +1264,7 @@ class Img {
         1
         ),0)}`, this.x, this.y - lineHeight*4 * 0.8)
     }
-
+    
     this.ctx.restore()
   }
   animate() {
@@ -1273,10 +1300,10 @@ class Img {
     nextFrame.opacity = anim.frameProgress/duration
     if(debug && curFrame.opacity + nextFrame.opacity == 0) console.log(`Total opacity 0!!!!!!!!!!!!!!!!!!!!!!`)
     
-    if(debug) console.log(`Frame progress: ${anim.frameProgress}`)
-    if(debug) console.log(`Current frame == next frame ${curFrame == nextFrame}`)
-    if(debug) console.log(`Current frame opacity: ${curFrame.opacity}`)
-    if(debug) console.log(`Next frame opacity: ${nextFrame.opacity}`)
+    // if(debug) console.log(`Frame progress: ${anim.frameProgress}`)
+    // if(debug) console.log(`Current frame == next frame ${curFrame == nextFrame}`)
+    // if(debug) console.log(`Current frame opacity: ${curFrame.opacity}`)
+    // if(debug) console.log(`Next frame opacity: ${nextFrame.opacity}`)
     return {curFrame: curFrame, nextFrame: nextFrame}
   }
 }
@@ -1325,17 +1352,32 @@ let mouseGlowProperties = {
   radius: 350,
 }
 let mouseGlow = new MouseGlow(0, 0,mouseGlowProperties.radius,tctx, tTransMult)
-let mouseTitleGlow = new MouseGlow(0, 0,mouseGlowProperties.radius,titctx, titTransMult)
 let images = []
 
-images.push(new Img(900, 1000, 800, 800, 0, imgSources['s1_gray_vale'].src,m2ctx,mg2TransMult, 'vale'))
+images.push(new Img(900, 1000, 800, 800, 0, imgSources['s1_gray_vale'].src,m2ctx,mg2TransMult, 'vale',1,undefined,undefined,false,true,
+{
+  frameDuration: 120, //in frames because fuck you
+  frameProgress: 0,
+  frames: [
+    {
+      src: imgSources['s1_gray_vale'].src,
+      opacity: 1
+    },
+    {
+      src: imgSources['s1_gray_vale'].src,
+      opacity: 0
+    },
+  ]
+}))
 images.push(new Img(900, 1000, 800, 800, 0, imgSources['s1_debris1'].src,mctx,mgTransMult, 'valedebris'))
 images.push(new Img(861, 944, 800, 800, 0, imgSources['s1_debris2'].src,mctx,mgTransMult, 'valedebris2'))
 images.push(new Img(376, 561, 150, 150, 0, imgSources['small_planet_saturn'].src,bctx,bgTransMult, 'saturn'))
 
-images.push(new Img(1660, 1597, 700, 700,0, imgSources['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl'))
-images.push(new Img(1667 , 1474, 700, 700,0, imgSources['cloud_small_1'].src,mctx,mgTransMult, 'clouds1'))
-images.push(new Img(1639, 1494, 700, 700,0, imgSources['cloud_small_2'].src,mctx,mgTransMult, 'clouds2'))
+images.push(new Img(1660, 1597, 700, 700,0, imgSources['cloud_large_1'].src,m2ctx,mg2TransMult, 'cloudl',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+images.push(new Img(1667 , 1474, 700, 700,0, imgSources['cloud_small_1'].src,mctx,mgTransMult, 'clouds1',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+images.push(new Img(1639, 1494, 700, 700,0, imgSources['cloud_small_2'].src,mctx,mgTransMult, 'clouds2',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+
+
 
 // images.push(new Img(949, 1546, 1000, 1000,0, imgSources['s3_no_stir'].src,mctx,mgTransMult, 's3nostir'))
 
@@ -1353,12 +1395,12 @@ images.push(new Img(2995 ,3494 ,120, 120, 0, imgSources['small_asteroid_2'].src,
 
 //stanza 5
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_bg'].src,b2ctx,bg2TransMult, 's5reedsbg'))
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_mg'].src,mctx,mgTransMult, 's5reedsmg',undefined,undefined,false,imgSources['s5_reeds_mg'].shadowSrc))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_mg'].src,m2ctx,mg2TransMult, 's5reedsmg'))
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_naiad_watery'].src,b2ctx,bg2TransMult, 's5naiad'))
 images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_water_shadow'].src,mctx,mgTransMult, 's5watershadow'))
-images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_fg'].src,m2ctx,mg2TransMult, 's5reedsfg',undefined,undefined,false,imgSources['s5_reeds_fg'].shadowSrc))
+images.push(new Img(1820, 1199, 1000, 1000, 0, imgSources['s5_reeds_fg'].src,tctx,tTransMult, 's5reedsfg'))
 //stanza 6
-images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand_fill_frame1'].src,mctx,mgTransMult, 's6sand_fill',undefined,undefined,false,false,true,
+images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand_fill_frame1'].src,mctx,mgTransMult, 's6sand_fill',1,undefined,undefined,false,true,
 {
   frameDuration: 120, //in frames because fuck you
   frameProgress: 0,
@@ -1396,23 +1438,31 @@ images.push(new Img(1820, 1199, 1300, 1300, 0, imgSources['s6_margin_sand_frame1
 }
 ))
 
-images.push(new Img(1395, 2500, 70, 70, 0, imgSources['s6_moon'].src,mctx,mgTransMult, 's6moon'))
+images.push(new Img(1395, 2500, 70, 70, 0, imgSources['s6_moon'].src,mctx,mgTransMult, 's6moon',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
 
 //stanza 7
-images.push(new Img(1820, 2000, 750, 750, 0, imgSources['s8_no_force'].src,m2ctx,mg2TransMult, 's8noforce'))
-images.push(new Img(1820, 2000, 600, 600, 0, imgSources['s7_headbowed'].src,m2ctx,mg2TransMult, 's7headbowed', 0.5))
-images.push(new Img(1820, 4000, 700, 700, 0, imgSources['s7_unsceptered'].src,m2ctx,mg2TransMult, 's7unsceptered'))
-
+images.push(new Img(1820, 4000, 700, 700, 0, imgSources['s7_unsceptered'].src,m2ctx,mg2TransMult, 's7unsceptered',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+//stanza 8
+images.push(new Img(1820, 2000, 750, 750, 0, imgSources['s8_no_force'].src,m2ctx,mg2TransMult, 's8noforce',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
 //stanza 9
-images.push(new Img(1820, 4000, 800, 800, 0, imgSources['s9_wheel'].src,m2ctx,mg2TransMult, 's9wheel'))
-images.push(new Img(1820, 4000, 372, 282, 0, imgSources['s9_cloud_small_1'].src,mctx,mgTransMult, 's9clouds1'))
-images.push(new Img(1820, 4000, 223, 158, 0, imgSources['s9_cloud_small_2'].src,mctx,mgTransMult, 's9clouds2'))
+images.push(new Img(1820, 4000, 800, 800, 0, imgSources['s9_wheel'].src,m2ctx,mg2TransMult, 's9wheel',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+images.push(new Img(1820, 4000, 372, 282, 0, imgSources['s9_cloud_small_1'].src,mctx,mgTransMult, 's9clouds1',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+images.push(new Img(1820, 4000, 223, 158, 0, imgSources['s9_cloud_small_2'].src,mctx,mgTransMult, 's9clouds2',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+//stanza 10
+images.push(new Img(1820, 7000, 800, 800, 0, imgSources['s10_sphinx'].src,mctx,mgTransMult, 's10sphinx',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
 //stanza 11
-images.push(new Img(1820, 4000, 800, 800, 0, imgSources['s11_sorrow'].src,m2ctx,mg2TransMult, 's11sorrow'))
+images.push(new Img(1820, 4000, 800, 800, 0, imgSources['s11_sorrow'].src,mctx,mgTransMult, 's11sorrow',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+images.push(new Img(1820, 7000, 800, 800, 0, imgSources['s11_sorrow_clouds'].src,m2ctx,mg2TransMult, 's11sorrowclouds',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+images.push(new Img(448, 7269, 122, 131, 0, imgSources['cloud_small_3'].src,b2ctx,bg2TransMult, 'clouds3',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
+images.push(new Img(448, 7269, 238, 161, 0, imgSources['cloud_small_4'].src,mctx,mgTransMult, 'clouds4',1,undefined,undefined,false,false,undefined,'brightness(0.7)'))
 //stanza 12
 images.push(new Img(1820, 4000, 256, 256, 0, imgSources['s12_thunder_small1'].src,mctx,mgTransMult, 's12tsmall1'))
 images.push(new Img(1820, 4000, 512, 512, 0, imgSources['s12_thunder_small2'].src,mctx,mgTransMult, 's12tsmall2'))
-images.push(new Img(1820, 4000, 1024, 1024, 0, imgSources['s12_thunder_large1'].src,m2ctx,mg2TransMult, 's12tlarge1'))
+images.push(new Img(1820, 4000, 1024, 1024, 0, imgSources['s12_thunder_large1'].src,m2ctx,mg2TransMult, 's12tlarge1',0.5))
+//stanza 13
+images.push(new Img(1820, 8000, 1024, 1024, 0, imgSources['s13_pressed_her_hand'].src,m2ctx,mg2TransMult, 's13pressedhand'))
+
+
 // images.push(new Img(1820, 1199, 90, 90, 0, imgSources['small_planet_nacron'].src,bctx,bgTransMult, 'nacron'))
 // images.push(new Img(259, 1762, 120, 120, 0, imgSources['small_planet_reia'].src,bctx,bgTransMult, 'reia'))
 
@@ -1425,6 +1475,31 @@ images.push(new Img(1820, 4000, 1024, 1024, 0, imgSources['s12_thunder_large1'].
 
 let textObjects = []
 let poemState = 0
+
+function createTitle() {
+  textObjects.push(new TextObject(
+    [
+      [-50,-100],
+      `John Keats`
+    ],
+    tctx,
+    tTransMult,
+    'text_author',
+    '40px andada'
+  ))
+  textObjects.push(new TextObject(
+    [
+      [-50,-50],
+      `Hyperion, Book I`
+    ],
+    tctx,
+    tTransMult,
+    'poem_title',
+    '80px andada'
+  ))
+}
+
+createTitle()
 
 function advancePoem() {
   let keys = Object.keys(poem)
@@ -1833,7 +1908,7 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
       let condition = query.substring(indexStart+1,query.length)
       console.log(condition)
       if(condition == -1 || indexStart == -1) return
-      let results = objects.filter(obj=> obj.y > condition)
+      let results = objects.filter(obj => obj.y > condition * obj.mult)
       selected = []
       for (let i = 0; i < results.length; i++) {
         match = results[i]
@@ -1934,8 +2009,18 @@ function init() {
     x: localStorage.getItem('globalTranslateX'),
     y: localStorage.getItem('globalTranslateY'),  
   })
+  calcVpOffset()
+  initGrid().then(setTimeout(()=>{hideTitleScreen()},1000), console.log('failed to init grid'))
+  
+  //hints
+  userUnderstand.hintMovement = setTimeout(()=> {
+    if(hints.length == 0) hints.push(new Hint('Use your mouse to drag around..','white', undefined, 'movement'))
+  },1000 * 8)
+  
+  userUnderstand.hintScroll = setTimeout(()=> {
+   if(hints.length == 0) hints.push(new Hint('You can also scroll with your mouse...','white', undefined, 'scroll'))
+  },1000 * 16)
 
-  initGrid()
 }
 
 function drawDebugInfo(fps,) {
@@ -1958,6 +2043,8 @@ function drawDebugInfo(fps,) {
         bctx.fill()
       }
       bctx.closePath()
+      bctx.fillStyle = 'white'
+      bctx.fillText(`X: ${cell.x} Y: ${cell.y}`,cell.x * stargrid.cellsize + 1 + 20, cell.y * stargrid.cellsize + 1 + 20)
       bctx.restore()
     })
     fctx.font = '12px arial'
@@ -1967,6 +2054,7 @@ function drawDebugInfo(fps,) {
     fctx.fillText(`Fps: ${fps.toFixed(2)}`, 5 - globalTranslate.x * fgTransMult, 75 - globalTranslate.y * fgTransMult)
     fctx.fillText(`Images rendered: ${images.filter(img=> img.visible).length}`, 5 - globalTranslate.x * fgTransMult, 90 - globalTranslate.y * fgTransMult)
     fctx.fillText(`Text objects rendered: ${textObjects.filter(obj=> obj.visible).length}`, 5 - globalTranslate.x * fgTransMult, 105 - globalTranslate.y * fgTransMult)
+    fctx.fillText(`Mouse position on tctx: x: ${mouseNow.x - globalTranslate.x} y: ${mouseNow.y - globalTranslate.y}`, 5 - globalTranslate.x * fgTransMult, 120 - globalTranslate.y * fgTransMult)
 
 }
 

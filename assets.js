@@ -30,6 +30,12 @@ let imgSources = {
   cloud_small_2: {
     src: 'assets/cloud_small_2.png'
   },
+  cloud_small_3: {
+    src: 'assets/cloud_small_3.png'
+  },
+  cloud_small_4: {
+    src: 'assets/cloud_small_4.png'
+  },
   //stanza specific assets
   s1_gray_vale: {
     src: 'assets/stanza1_gray_vale.png'
@@ -117,8 +123,14 @@ let imgSources = {
   s9_cloud_small_2: {
     src: 'assets/s9_cloud_small_2.png'
   },
+  s10_sphinx: {
+    src: 'assets/s10_sphinx.png'
+  },
   s11_sorrow: {
     src: 'assets/s11_sorrow.png'
+  },
+  s11_sorrow_clouds: {
+    src: 'assets/s11_sorrow_clouds.png'
   },
   s12_thunder_small1: {
     src: 'assets/s12_thunder_small1.png'
@@ -129,9 +141,24 @@ let imgSources = {
   s12_thunder_large1: {
     src: 'assets/s12_thunder_large1.png'
   },
+  s13_pressed_her_hand: {
+    src: 'assets/s13_pressed_her_hand.png'
+  },
 }
 
 let particleGenerators = [
+  {
+    parent: 'poem_title',
+    offset: [ 300, 0 ],
+    spawnRate: 60,
+    spawnChance: 0.4,
+    spawnRange: 600,
+    color: 'hsl(250,10%,75%)',
+    lifeMin: 60*6,
+    lifeMax: 60*8,
+    force: undefined,
+    velRange: undefined,
+  },
   {
     parent: 'vale', // by object id from objects inside objects []
     offset: [ 0, -150 ], // offset the center of the generator by x and y
@@ -230,7 +257,7 @@ let particleGenerators = [
     spawnRate: 20,
     spawnChance: 0.2,
     spawnRange: 150,
-    color: 'hsla(240,15%,80%,0.6)',
+    color: 'hsla(220,15%,50%,0.7)',
     lifeMin: 60*4,
     lifeMax: 60*10,
     force: {
@@ -250,7 +277,7 @@ let particleGenerators = [
     spawnRate: 20,
     spawnChance: 0.2,
     spawnRange: 150,
-    color: 'hsla(240,15%,80%,0.6)',
+    color: 'hsla(225,15%,50%,0.7)',
     lifeMin: 60*4,
     lifeMax: 60*10,
     force: {
@@ -270,7 +297,7 @@ let particleGenerators = [
     spawnRate: 60,
     spawnChance: 0.2,
     spawnRange: 150,
-    color: 'hsla(240,15%,80%,0.6)',
+    color: 'hsla(230,15%,50%,0.7)',
     lifeMin: 60*4,
     lifeMax: 60*10,
     force: {

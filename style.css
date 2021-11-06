@@ -195,6 +195,7 @@ input[type=checkbox] {
   align-content: center;
   justify-content: center;
   font-family: 'andada';
+  cursor: none;
 }
 .title-screen .text {
   display: flex;
@@ -224,4 +225,45 @@ input[type=checkbox] {
   height: 2px;
   background-color: white;
   margin: 1.5rem 0;
+}
+
+.hint-overlay {
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10;
+  /* background:linear-gradient(rgba(255, 255, 255, 0.0),rgba(255, 255, 255, 0.2)); */
+  display: flex;
+  flex-direction: column-reverse;
+  pointer-events: none;
+}
+.hint-container {
+  position: absolute;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  align-items: center;
+}
+.hint {
+  border-radius: 50px;
+  padding: 10px 20px;
+  margin-bottom: 15px;
+  font-size: 25px;
+  font-family: 'andada';
+  /* box-shadow: 0px 0px 10px 2px hsl(240,17%,7%); */
+}
+
+.anim-pulse {
+  animation: 1.5s linear 0s infinite both running pulse;
+}
+@keyframes pulse {
+  0% {
+    filter: brightness(0.4);
+  }
+  50% {
+    filter: brightness(1);
+  }
+  100% {
+    filter: brightness(0.4);
+  }
 }
