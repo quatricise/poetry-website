@@ -1,5 +1,5 @@
 let debug = false;
-let controlsVisible = false;
+let controlsVisible = true;
 let graphics = 'medium';
 let userInteracted = false;
 let audioOn = false;
@@ -229,40 +229,43 @@ document.addEventListener('keydown', function (e) {
       },25)
     }
   }
-  if(e.code == 'KeyH' && selected) {
-    selected.forEach((obj)=> obj.hidden = !obj.hidden)
-  }
-  if(e.code == 'KeyC' && (changingXforSelected || changingYforSelected || changingRotforSelected) && selected) {
-    changingXforSelected = false
-    changingYforSelected = false
-    changingRotforSelected = false
-    selected.forEach((obj,index)=> {
-      obj.x = selectedCoordsBackup[index].x
-      obj.y = selectedCoordsBackup[index].y
-    })
-
-  }
-  if(e.code == 'KeyX') {
-    selected.forEach(obj=> deleteObject(obj))
-  }
-  if(e.code == 'KeyZ' || e.code == 'KeyY' ) {
-    undo()
-  }
-  if(e.code == 'KeyS') {
-    exportToJsonFile(objects)
-  }
-  if(e.code == 'KeyD' && selected ) {
-    selected.forEach((obj,index)=> duplicateObject(selected[index]))
-  }
-  if(e.code == 'Escape' && selected ) {
-    selected.forEach(obj=> deselect())
-  }
-  if(e.code == 'Space') {
-    particles.forEach(part=> {
-      part.velX += Math.random()*4 - 2
-      part.velY += Math.random()*4 - 2
-    })
-    shakeCamera(10,260)
+  if(document.activeElement != queryInput) {
+    
+    if(e.code == 'KeyH' && selected) {
+      selected.forEach((obj)=> obj.hidden = !obj.hidden)
+    }
+    if(e.code == 'KeyC' && (changingXforSelected || changingYforSelected || changingRotforSelected) && selected) {
+      changingXforSelected = false
+      changingYforSelected = false
+      changingRotforSelected = false
+      selected.forEach((obj,index)=> {
+        obj.x = selectedCoordsBackup[index].x
+        obj.y = selectedCoordsBackup[index].y
+      })
+  
+    }
+    if(e.code == 'KeyX') {
+      selected.forEach(obj=> deleteObject(obj))
+    }
+    if(e.code == 'KeyZ' || e.code == 'KeyY' ) {
+      undo()
+    }
+    if(e.code == 'KeyS') {
+      exportToJsonFile(objects)
+    }
+    if(e.code == 'KeyD' && selected) {
+      selected.forEach((obj,index)=> duplicateObject(selected[index]))
+    }
+    if(e.code == 'Escape' && selected) {
+      selected.forEach(obj=> deselect())
+    }
+    if(e.code == 'Space') {
+      particles.forEach(part=> {
+        part.velX += Math.random()*4 - 2
+        part.velY += Math.random()*4 - 2
+      })
+      shakeCamera(10,260)
+    }
   }
 
 },false)
@@ -283,7 +286,7 @@ document.addEventListener('keyup', function (e) {
   }
 },false)
 
-document.addEventListener('wheel', processWheelEvents, {passive: true})
+document.addEventListener('wheel', processWheelEvents, {passive: false})
 
 function processWheelEvents(e) { //scroll event listener
   if(e.deltaY < 0 && !pressedCtrl && !pressedShift) {
@@ -311,6 +314,15 @@ function processWheelEvents(e) { //scroll event listener
       if(obj.dimX && obj.dimY) {
         obj.dimX = obj.dimX * clamp(e.deltaY,0.95,1.05)
         obj.dimY = obj.dimY * clamp(e.deltaY,0.95,1.05)
+      }
+    })
+  }
+  if(pressedShift && pressedCtrl && selected.length > 0) {
+    e.preventDefault()
+    selected.forEach(obj=> {
+      if('rotation' in obj) {
+        obj.rotation += (clamp(e.deltaY,-1,1) * PI)/90
+        obj.rotation.toFixed(2)
       }
     })
   }
@@ -394,6 +406,7 @@ document.addEventListener('mousemove', function(e) {
 function dismissHint(forWhat) {
   if(forWhat == 'movement') {
     userUnderstand.movement = true
+    localStorage.setItem('userUnderstand movement','true')
     clearInterval(userUnderstand.hintMovement)
     let filtered = hints.filter(hint=> hint.forWhat == 'movement')
     if(filtered.length > 0) filtered.forEach(hint=> hint.dismissed = true)
@@ -401,6 +414,7 @@ function dismissHint(forWhat) {
   else
   if(forWhat == 'scroll') {
     userUnderstand.scroll = true
+    localStorage.setItem('userUnderstand scroll','true')
     clearInterval(userUnderstand.hintScroll)
     let filtered = hints.filter(hint=> hint.forWhat == 'scroll')
     if(filtered.length > 0) filtered.forEach(hint=> hint.dismissed = true)
@@ -921,7 +935,6 @@ function generateCell(x,y) {
 
 }
 
-
 async function initGrid() {
   for (let x = vpOffset.x - 2; x < window.innerWidth / stargrid.cellsize + 2 ; x++) {
     for (let y = vpOffset.y - 2; y < window.innerHeight / stargrid.cellsize + 2 ; y++) {
@@ -989,17 +1002,6 @@ class TextObject {
     this.x = x
     this.y = y
     this.hidden = false
-    // if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
-    //   this.x = +localStorage.getItem(`${this.id} x`)
-    //   this.y = +localStorage.getItem(`${this.id} y`)
-    // }
-    // if(localStorage.getItem(`${this.id} hidden`) == 'false') {
-    //   this.hidden = false
-    // }
-    // else if(localStorage.getItem(`${this.id} hidden`) == 'true') {
-    //   this.hidden = true
-    // }
-    
     this.text = text
     this.ctx = ctx
     this.mult = mult
@@ -1106,21 +1108,7 @@ class Img {
     this.x = x
     this.y = y
     this.hidden = false
-    // if(localStorage.getItem(`${this.id} dimX`) || localStorage.getItem(`${this.id} dimY`)) {
-    //   this.dimX = +localStorage.getItem(`${this.id} dimX`)
-    //   this.dimY = +localStorage.getItem(`${this.id} dimY`)
-    // }
-    // if(localStorage.getItem(`${this.id} x`) || localStorage.getItem(`${this.id} y`)) {
-    //   this.x = +localStorage.getItem(`${this.id} x`)
-    //   this.y = +localStorage.getItem(`${this.id} y`)
-    // }
-    // if(localStorage.getItem(`${this.id} hidden`) == 'false') {
-    //   this.hidden = false
-    // }
-    // else if(localStorage.getItem(`${this.id} hidden`) == 'true') {
-    //   this.hidden = true
-    // }
-    this.rotation = rotation * PI/180 // provide this in deg, convert to radians here
+    this.rotation = rotation // using radians everywhere
     this.src = src
     this.img = new Image()
     this.img.src = src
@@ -1226,7 +1214,7 @@ class Img {
       this.ctx.filter = 'brightness(0.5)'
     }
     
-    if((matchedObject == this && pressedShift) /* || (pressedCtrl) */ || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
+    if((matchedObject == this && pressedShift) || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.save()
       if(pressedCtrl) this.ctx.strokeStyle = 'hsla(0,0%,100%,0.3)'
       else this.ctx.strokeStyle = 'blue'
@@ -1248,25 +1236,28 @@ class Img {
 
     //draw the actual image
     this.ctx.save()
+    this.ctx.translate(this.x,this.y)
+    this.ctx.rotate(this.rotation)
     if(!this.animated) {
       this.ctx.globalAlpha = this.opacity*this.maxOpacity
-      this.ctx.drawImage(this.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+      this.ctx.drawImage(this.img, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
     }
     if(this.animated) {
       this.ctx.globalAlpha = curFrame.opacity*this.maxOpacity
-      this.ctx.drawImage(curFrame.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+      this.ctx.drawImage(curFrame.img, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
       this.ctx.globalAlpha = nextFrame.opacity * this.maxOpacity
-      this.ctx.drawImage(nextFrame.img,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+      this.ctx.drawImage(nextFrame.img, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
 
-      // console.log(this.animation.frames[this.animation.currentFrameNum].opacity)
     }
     this.ctx.restore()
     
     if(this.shadow) {
       this.ctx.save()
+      this.ctx.translate(this.x,this.y)
+      this.ctx.rotate(this.rotation)
       this.ctx.filter = 'brightness(1)'
       this.ctx.globalAlpha = 1
-      this.ctx.drawImage(this.shadow,this.x - this.dimX/2,this.y - this.dimY/2,this.dimX,this.dimY)
+      this.ctx.drawImage(this.shadow, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
       this.ctx.restore()
     }
 
@@ -1331,10 +1322,6 @@ class Img {
     nextFrame.opacity = anim.frameProgress/duration
     if(debug && curFrame.opacity + nextFrame.opacity == 0) console.log(`Total opacity 0!!!!!!!!!!!!!!!!!!!!!!`)
     
-    // if(debug) console.log(`Frame progress: ${anim.frameProgress}`)
-    // if(debug) console.log(`Current frame == next frame ${curFrame == nextFrame}`)
-    // if(debug) console.log(`Current frame opacity: ${curFrame.opacity}`)
-    // if(debug) console.log(`Next frame opacity: ${nextFrame.opacity}`)
     return {curFrame: curFrame, nextFrame: nextFrame}
   }
 }
@@ -1387,37 +1374,6 @@ let images = []
 
 let textObjects = []
 let poemState = 0
-
-// function createTitle() {
-//   textObjects.push(new TextObject(
-//     [
-//       [-50,-100],
-//       `John Keats`
-//     ],
-//     tctx,
-//     tTransMult,
-//     'text_author',
-//     '40px andada'
-//   ))
-//   textObjects.push(new TextObject(
-//     [
-//       [-50,-50],
-//       `Hyperion, Book I`
-//     ],
-//     tctx,
-//     tTransMult,
-//     'poem_title',
-//     '80px andada'
-//   ))
-// }
-
-// createTitle()
-
-// function advancePoem() {
-//   let keys = Object.keys(poem)
-//   textObjects.push(new TextObject(poem[keys[poemState]],tctx,tTransMult,`s${poemState + 1}`))
-//   poemState++
-// }
 
 class Chain {
   constructor(origin,linkCount,linkAngle) {
@@ -1770,7 +1726,7 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
     let query = queryInput.value;
     if(query.search("allfrom:","") != -1) {
       let indexStart = query.search("y")
-      let condition = query.substring(indexStart+1,query.length)
+      let condition = query.substring(indexStart + 1, query.length)
       console.log(condition)
       if(condition == -1 || indexStart == -1) return
       let results = objects.filter(obj => obj.y > condition * obj.mult)
@@ -1779,6 +1735,69 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
         match = results[i]
         selected.push(match) 
       }
+    }
+    else if(query.search("set:","") != -1) {
+      let indexStart = query.search(":")
+      let dividerIndex = query.search("-")
+      let property = query.substring(indexStart + 1, dividerIndex)
+      let value = query.substring(dividerIndex + 1, query.length)
+      if( property == 'x' || property == 'y' || property == 'dimX' || property == 'dimY' || property == 'rotation' || property == 'maxOpacity'|| property == 'opacity' ) value = +value
+      if( property == 'animated' || property == 'chainlink' || property == 'glowUnderCursor') value = !!value
+      if( property == 'ctx' ) {
+        let mult;
+        if(value == 'bctx') {
+          value = bctx
+          mult = bgTransMult
+        }
+        if(value == 'b2ctx'){ 
+          value = b2ctx
+          mult = bg2TransMult
+
+        }
+        if(value == 'mctx') {
+          value = mctx
+          mult = mgTransMult
+
+        }
+        if(value == 'm2ctx'){ 
+          value = m2ctx
+          mult = mg2TransMult
+
+        }
+        if(value == 'tctx') {
+          value = tctx
+          mult = tTransMult
+
+        }
+        if(value == 'fctx') {
+          value = fctx
+          mult = fgTransMult
+
+        }
+        if(value == 'f2ctx'){ 
+          value = f2ctx
+          mult = fg2TransMult
+        }
+        
+        selected.forEach(obj=> {
+          if(value == obj.ctx) return
+          obj.x *= mult/obj.mult
+          obj.y *= mult/obj.mult
+          obj.mult = mult
+        })
+        
+        
+      }
+      if( property == 'src' ) {
+        value = 'assets/' + value + '.png'
+        selected.forEach(obj=> {
+          obj.img.src = value
+        })
+      }
+      selected.forEach(obj=> {
+        obj[property] = value
+      })
+      console.log(indexStart,dividerIndex,property,value)
     }
     else {
       query = query.split(",")
@@ -1808,7 +1827,7 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
     labelY.innerHTML = match.y
     idDisplay.innerHTML = match.id
   }
-  // console.log(match)
+  console.log(match)
 }
 
 function deselect() {
@@ -1897,13 +1916,17 @@ function init() {
   initGrid().then(setTimeout(()=>{hideTitleScreen()},1000), console.log('failed to init grid'))
   
   //hints
-  userUnderstand.hintMovement = setInterval(()=> {
-    if(hints.length == 0) hints.push(new Hint('Use your mouse to drag around..','white', undefined, 'movement'))
-  },1000 * 8)
+  if(localStorage.getItem('userUnderstand movement') != 'true') {
+    userUnderstand.hintMovement = setInterval(()=> {
+      if(hints.length == 0) hints.push(new Hint('Use your mouse to drag around..','white', undefined, 'movement'))
+    },1000 * 8)
+  }
   
-  userUnderstand.hintScroll = setInterval(()=> {
-   if(hints.length == 0) hints.push(new Hint('You can also scroll with your mouse...','white', undefined, 'scroll'))
-  },1000 * 9)
+  if(localStorage.getItem('userUnderstand scroll') != 'true') {
+    userUnderstand.hintScroll = setInterval(()=> {
+      if(hints.length == 0) hints.push(new Hint('You can also scroll with your mouse...','white', undefined, 'scroll'))
+    },1000 * 9)
+  }
 
   readObjectData()
 }
