@@ -19,11 +19,13 @@ function readObjectData() {
     let ctx;
     if(obj.mult == bgTransMult) ctx = bctx
     if(obj.mult == bg2TransMult) ctx = b2ctx
+    if(obj.mult == bg3TransMult) ctx = b3ctx
     if(obj.mult == mgTransMult) ctx = mctx
     if(obj.mult == mg2TransMult) ctx = m2ctx
     if(obj.mult == tTransMult) ctx = tctx
     if(obj.mult == fgTransMult) ctx = fctx
     if(obj.mult == fg2TransMult) ctx = f2ctx
+    if(obj.mult == fg3TransMult) ctx = f3ctx
 
     if(obj.objectType == 'img') images.push(new Img(
       obj.x,
@@ -42,7 +44,9 @@ function readObjectData() {
       obj.animated,
       obj.animation,
       obj.filter,
-      obj.chainlink
+      obj.chainlink,
+      obj.isStatic,
+      obj.velocity,
     ))
     if(obj.objectType == 'textObject') textObjects.push(new TextObject(
       obj.x,

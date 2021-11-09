@@ -28,3 +28,7 @@ textObjects.push(new TextObject(
 
 //legend↑
 
+images.push(new Img(2248, 780, 120, 120, 0, imgSources['small_asteroid_2'].src,f2ctx,fg2TransMult, 'comet',1,undefined,false,false,false,undefined,false,false,false,{
+  x: 2,
+  y: 2,
+}))

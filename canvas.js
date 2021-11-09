@@ -21,9 +21,11 @@ let scrollVelocity = 0
 let scrollFriction = 0.08
 let mainTimer = [0,60]
 let movedTimer = [0,60*8]
+let cometSpawnTimer = [0,25]
 let timers = [
   mainTimer,
   movedTimer,
+  cometSpawnTimer,
 ]
 let queryInput = document.querySelector('#query-input')
 let idDisplay = document.querySelector('#selected-object-id')
@@ -77,47 +79,54 @@ let initialValues = [];
 
 let canvasBg = document.getElementById('canvas-bg')
 let canvasBg2 = document.getElementById('canvas-bg2')
+let canvasBg3 = document.getElementById('canvas-bg3')
 let canvasMg = document.getElementById('canvas-mg')
 let canvasMg2 = document.getElementById('canvas-mg2')
 let canvasText = document.getElementById('canvas-text')
 let canvasFg = document.getElementById('canvas-fg')
 let canvasFg2 = document.getElementById('canvas-fg2')
+let canvasFg3 = document.getElementById('canvas-fg3')
 
 
 const bctx = canvasBg.getContext('2d')
 const b2ctx = canvasBg2.getContext('2d')
+const b3ctx = canvasBg3.getContext('2d')
 const mctx = canvasMg.getContext('2d')
 const m2ctx = canvasMg2.getContext('2d')
 const tctx = canvasText.getContext('2d')
 const fctx = canvasFg.getContext('2d')
 const f2ctx = canvasFg2.getContext('2d')
+const f3ctx = canvasFg3.getContext('2d')
 
 
 let bgTransMult = 0.25
 let bg2TransMult = 0.80
+let bg3TransMult = 0.72
 let mgTransMult = 0.88
 let mg2TransMult = 0.95
 let tTransMult = 1
 let fgTransMult = 1.5
 let fg2TransMult = 2.2
-
-// let titTransMult = 1
+let fg3TransMult = 1.08
 
 let contexts = []
-contexts.push(bctx,b2ctx,mctx,m2ctx,tctx,fctx,f2ctx)
+contexts.push(bctx,b2ctx,b3ctx,mctx,m2ctx,tctx,fctx,f2ctx,f3ctx)
 let mults = []
-mults.push(bgTransMult,
+mults.push(
+  bgTransMult,
   bg2TransMult,
+  bg3TransMult,
   mgTransMult,
   mg2TransMult,
   tTransMult,
   fgTransMult,
   fg2TransMult,
+  fg3TransMult,
 )
 
 
 let canvases = []
-canvases.push(canvasBg,canvasBg2,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2)
+canvases.push(canvasBg,canvasBg2,canvasBg3,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2,canvasFg3)
 canvases.forEach(canvas => {
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight
@@ -131,8 +140,8 @@ let ch = window.innerHeight
 window.onresize = () => {
   let globalTransPrev = globalTranslate
   globalTranslate = {x:0,y:0}
-  let prevCw = cw
-  let prevCh = ch
+  // let prevCw = cw
+  // let prevCh = ch
   cw = window.innerWidth
   ch = window.innerHeight
   canvases.forEach(canvas => {
@@ -202,8 +211,27 @@ async function loadFonts() {
   mainfont = '22px andada';
 }
 loadFonts()
+let imageKeys = Object.keys(imgSources)
+let imageCount = imageKeys.length
+// console.log(imageCount)
+let imagesLoaded = 0;
 
+function loadImages() {
+  for (let i = 0; i < imageCount; i++) {
+    let img = new Image()
+    img.src = imgSources[imageKeys[i]].src
+    img.onload = () => {loadProgress()}
+  }
 
+}
+function loadProgress() {
+  imagesLoaded++
+  if(imagesLoaded == imageCount) {
+    console.log('all images from imgSources are loaded')
+  }
+}
+
+loadImages()
 
 bothAxisCheckbox.addEventListener('change', function() {
   changeBothAxis = !changeBothAxis
@@ -251,7 +279,12 @@ document.addEventListener('keydown', function (e) {
       undo()
     }
     if(e.code == 'KeyS') {
-      exportToJsonFile(objects)
+      let objs = objects.filter(obj=> !obj.comet)
+      // console.log(objs)
+      exportToJsonFile(objs)
+    }
+    if(e.code == 'KeyP') {
+      cancelAnimationFrame(drawloop)
     }
     if(e.code == 'KeyD' && selected) {
       selected.forEach((obj,index)=> duplicateObject(selected[index]))
@@ -532,11 +565,13 @@ function moveCanvas(e, offset) {
   dy *= dragMultiplier
   bctx.translate(dx * bgTransMult,  dy * bgTransMult)
   b2ctx.translate(dx * bg2TransMult,  dy * bg2TransMult)
+  b3ctx.translate(dx * bg3TransMult,  dy * bg3TransMult)
   mctx.translate(dx * mgTransMult,  dy * mgTransMult)
   m2ctx.translate(dx * mg2TransMult,  dy * mg2TransMult)
   tctx.translate(dx * tTransMult,   dy * tTransMult)
   fctx.translate(dx * fgTransMult,  dy * fgTransMult)
   f2ctx.translate(dx * fg2TransMult,  dy * fg2TransMult)
+  f3ctx.translate(dx * fg3TransMult,  dy * fg3TransMult)
 
   globalTranslate.x += dx
   globalTranslate.y += dy
@@ -553,33 +588,35 @@ function calcMouseTravel(frame1,frame2) {
 }
 
 //main draw
+let drawloop;
 function draw(currentTimestamp) {
   var dt = (currentTimestamp - lastTimestamp)/1000
   var fps = 1/dt
   lastTimestamp = currentTimestamp
 
   timers.forEach(timer=> {
-    // if(timer == mainTimer) {
       timer[0]++
       if(timer[0] > timer[1]) timer[0] = 0
-    // }
-    // if(timer == movedTimer) {
-      // timer[0]++
-    // }
   })
 
   clearCtx(bctx,bgTransMult)
   clearCtx(b2ctx,bg2TransMult)
+  clearCtx(b3ctx,bg3TransMult)
   clearCtx(mctx,mgTransMult)
   clearCtx(m2ctx,mg2TransMult)
   clearCtx(tctx,tTransMult)
   clearCtx(fctx,fgTransMult)
   clearCtx(f2ctx,fg2TransMult)
+  clearCtx(f3ctx,fg3TransMult)
 
   //hints
 
 
   // update
+
+  objects.forEach(obj=> {
+    obj.update()
+  })
 
   images.forEach(img=> {
     if(!img.chainlink) return
@@ -588,6 +625,13 @@ function draw(currentTimestamp) {
       img.maxOpacity = clamp(img.maxOpacity + 0.002,0,1)
     }
   })
+
+  images.forEach(img => {
+    if(img.hasTrail) {
+      img.updateTrail()
+    }
+  })
+
 
   chainlinksInvisibleTimer = Math.max(chainlinksInvisibleTimer - 1,0)
 
@@ -599,7 +643,6 @@ function draw(currentTimestamp) {
   if(mouseStates.length > 1) {
     mousePrev = mouseStates[0]
     if(mouseStates[0] != mouseStates[1]) {
-      // console.log('Mouse moved between this and previous frame')
       calcMouseTravel(mouseStates[0],mouseStates[1])
     }
     mouseStates.shift()
@@ -638,12 +681,37 @@ function draw(currentTimestamp) {
   localStorage.setItem('globalTranslateX', globalTranslate.x)
   localStorage.setItem('globalTranslateY', globalTranslate.y)
 
+  if(mainTimer[0] == mainTimer[1]) {
+    let chance = random(0,100)
+    if(chance > 85 && chance <= 96) {
+      spawnAsteroid()
+    }
+    if(chance > 96) {
+      spawnComet()
+    }
+  }
+
   //cleanup
   if(mainTimer[0] == mainTimer[1]) {
     particles.forEach((particle,index)=> {
       if(particle.dead) particles.splice(index,1)
     })
     deleteFarCells()
+    images.forEach(img=> {
+      if(img.comet == false) return
+        if(
+          img.x > -globalTranslate.x*img.mult - img.dimX*16 &&
+          img.x < -globalTranslate.x*img.mult + cw + img.dimX*16 &&
+          img.y > -globalTranslate.y*img.mult - img.dimY*16 &&
+          img.y < -globalTranslate.y*img.mult + ch + img.dimY*16
+          ) {
+            // keep the comet
+          }
+          else {
+            deleteObject(img)
+            console.log('comet deleted')
+          }
+    })
   }
 
   // draw
@@ -678,12 +746,30 @@ function draw(currentTimestamp) {
     obj.draw()
   })
   images.forEach(img => {
+    if(img.hasTrail) return
     if(
       img.x > -globalTranslate.x*img.mult - img.dimX &&
       img.x < -globalTranslate.x*img.mult + cw + img.dimX &&
       img.y > -globalTranslate.y*img.mult - img.dimY &&
       img.y < -globalTranslate.y*img.mult + ch + img.dimY
       ) {
+        img.draw()
+        img.visible = true
+      }
+      else {
+        img.visible = false
+      }
+  })
+
+  images.forEach(img => {
+    if(!img.hasTrail) return
+    if(
+      img.x > -globalTranslate.x*img.mult - img.dimX*8 &&
+      img.x < -globalTranslate.x*img.mult + cw + img.dimX*8 &&
+      img.y > -globalTranslate.y*img.mult - img.dimY*8 &&
+      img.y < -globalTranslate.y*img.mult + ch + img.dimY*8
+      ) {
+        img.drawTrail()
         img.draw()
         img.visible = true
       }
@@ -706,7 +792,7 @@ function draw(currentTimestamp) {
   }
   drawSelectionCursor()
 
-  requestAnimationFrame(draw)
+  drawloop = requestAnimationFrame(draw)
   
 }
 //end of main draw
@@ -734,7 +820,7 @@ function drawBg(ctx,mult, options = {opacity: 1}) {
 
 let starProperties = {
   density: 15, // per grid cell
-  colors: ['hsl(224,25%,20%)','hsl(272,13%,50%)','hsl(320,60%,25%)','hsl(240,23%,28%)'],
+  colors: ['hsl(224,25%,20%)','hsl(272,13%,38%)','hsl(320,60%,25%)','hsl(240,23%,28%)'],
   radius: 1.2,
   radiusRange: 0.3,
 }
@@ -880,11 +966,11 @@ function populateBorderCells() {
     &&
     cell.populated == false
   )
-  console.log(unpopulated.length)
+  // console.log(unpopulated.length)
   unpopulated.forEach(cell => {
     populateCell(cell)
   })
-  if(debug) console.log(`Cells populated: ${unpopulated.length}`)
+  // if(debug) console.log(`Cells populated: ${unpopulated.length}`)
 }
 
 function deleteFarCells() {
@@ -995,7 +1081,7 @@ class Hint {
 }
 
 class TextObject {
-  constructor(x,y,text,ctx,mult, id = Math.floor(Math.random()*1_000_000_000),font = undefined) {
+  constructor(x,y,text,ctx,mult, id = Math.floor(Math.random()*1_000_000_000),font = undefined,isStatic = true) {
     this.id = id
     // this.x = text[0][0]
     // this.y = text[0][1]
@@ -1006,8 +1092,9 @@ class TextObject {
     this.ctx = ctx
     this.mult = mult
     this.font = font
-    this.visible = false;
+    this.visible = false
     this.selected = false
+    this.isStatic = isStatic
     this.objectType = "textObject"
     objects.push(this)
     initialValues.push({
@@ -1076,6 +1163,9 @@ class TextObject {
     }
     this.ctx.restore()
   }
+  update() {
+    if(this.isStatic) return
+  }
 }
 
 class Img {
@@ -1100,7 +1190,13 @@ class Img {
       framesTotal: 0,
     },
     filter = null,
-    chainlink = false
+    chainlink = false,
+    isStatic = true,
+    velocity = {x:0,y:0},
+    comet = false,
+    rotationSpeed = 0,
+    hasTrail = false,
+    trail = undefined,
     ) {
     this.id = id
     this.dimX = dimX
@@ -1143,6 +1239,12 @@ class Img {
     this.animated = animated
     this.filter = filter
     this.chainlink = chainlink
+    this.isStatic = isStatic
+    this.velocity = velocity
+    this.comet = comet
+    this.hasTrail = hasTrail
+    this.trail = trail
+    this.rotationSpeed = rotationSpeed
     this.objectType = "img"
     objects.push(this)
     initialValues.push({
@@ -1207,7 +1309,10 @@ class Img {
       }
       this.ctx.globalCompositeOperation = 'source-atop'
     }
-    if(darken > 0) {
+    if(this.comet) {
+      this.ctx.filter = ''
+    }
+    else if(darken > 0) {
       this.ctx.filter = `brightness(${Math.min(0.5 + darken,1)})`
     }
     else {
@@ -1230,7 +1335,7 @@ class Img {
       this.ctx.closePath()
       this.ctx.fill()
       if(pressedCtrl) this.ctx.filter = ''
-      else this.ctx.filter = 'brightness(1.5)'
+      else this.ctx.filter = 'brightness(3)'
     }
     if(this.filter) this.ctx.filter = this.filter
 
@@ -1267,11 +1372,29 @@ class Img {
     if((matchedObject == this && pressedShift) || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.restore()
     }
+    // if(debug || pressedShift) {
+    //   let topCtx = contexts[contexts.length - 1]
+    //   topCtx.save()
+    //   if(selectedObject == this) topCtx.fillStyle = 'orange'
+    //   else topCtx.fillStyle = 'white'
+    //   topCtx.fillRect(
+    //     this.x * (mults[mults.length - 1] / this.mult) - 6 - (globalTranslate.x*(mults[mults.length - 1] / this.mult) + this.x),
+    //     this.y * (mults[mults.length - 1] / this.mult) - 6,
+    //     12,
+    //     12
+    //   );
+    //   topCtx.restore()
+    // }
     if(debug || pressedShift) {
       this.ctx.save()
       if(selectedObject == this) this.ctx.fillStyle = 'orange'
       else this.ctx.fillStyle = 'white'
-      this.ctx.fillRect(this.x - 6,this.y - 6,12,12)
+      this.ctx.fillRect(
+        this.x  - 6,
+        this.y  - 6,
+        12,
+        12
+      );
       this.ctx.restore()
     }
     if(debug) {
@@ -1288,6 +1411,113 @@ class Img {
         ),0)}`, this.x, this.y - lineHeight*4 * 0.8)
     }
     this.ctx.restore()
+  }
+  drawTrail() {
+    this.trail.children.forEach((child, index)=> {
+      this.ctx.save()
+      this.ctx.translate(child.x,child.y)
+      this.ctx.rotate(child.rot)
+      this.ctx.globalAlpha = Math.max(child.life/child.lifeInit,0)
+      this.ctx.filter = this.filter
+      this.ctx.drawImage(child.img, 0 - child.dimX/2, 0 - child.dimY/2, child.dimX, child.dimY)
+      this.ctx.restore()
+    })
+  }
+  updateTrail() {
+
+    if(cometSpawnTimer[0] == cometSpawnTimer[1]) {
+      this.spawnTrailChild()
+    }
+
+    this.trail.children.forEach((child)=> {
+      
+      let lifestage = child.lifeInit/(this.trail.sources.length)
+      let currentStage = Math.floor((child.life - 1) / lifestage)
+
+      if(child.currentStage != currentStage) { //current stage block
+
+        child.currentStage = currentStage
+        child.img = new Image()
+        child.img.src = this.trail.sources[currentStage]
+        child.rot = random(0,PI*2,{round: false})
+
+        if(
+          random(0,100) > 88 && 
+          child.currentStage > 1 && 
+          child.bornBySplitting < 2
+        ) {
+          // let img = new Image(); img.src = child.img.src;
+          
+          let posRand = random(-3,3,{ round: true })
+          for (let i = -1; i < 2; i += 2) {
+            let vel = vectorRotate(
+              child.vel.x / 2,
+              child.vel.y / 2,
+              (i * random(60, 120, { round: true }) * PI) / 180
+            )
+            this.trail.children.push({
+              x: child.x + posRand,
+              y: child.y - posRand,
+              dimX: child.dimX,
+              dimY: child.dimY,
+              vel: {
+                x: child.vel.x * 0.75 + vel.x * 0.25,
+                y: child.vel.x * 0.75 + vel.y * 0.25,
+              },
+              rot: random(0, PI * 2, { round: false }),
+              rotSpeed: random(-0.05, 0.05, { round: false, toFixed: 4 }),
+              img: child.img,
+              life: child.life,
+              lifeInit: child.lifeInit,
+              currentStage: child.currentStage,
+              bornBySplitting: child.bornBySplitting + 1,
+              delete: false,
+            });
+          }
+          child.delete = true
+        }
+      } //end of currentstage block
+
+      child.x += child.vel.x
+      child.y += child.vel.y
+      let shrink = 0.995
+      child.dimX *= shrink
+      child.dimY *= shrink
+      child.rot += child.rotSpeed
+      child.vel.x *= 0.995
+      child.vel.y *= 0.995
+      child.life--
+      if(child.life <= 0 || child.delete) {
+        this.trail.children = this.trail.children.filter(trail=> trail != child)
+        // console.log('removed trail child')
+      }
+    })
+  }
+  spawnTrailChild() {
+    let img = new Image()
+    img.src = this.trail.sources[this.trail.sources.length - 1]
+    let life = random(
+      cometSpawnTimer[1]*this.trail.sources.length * 1.5,
+      cometSpawnTimer[1]*this.trail.sources.length * 3
+    )
+    this.trail.children.push({
+      x: this.x + random(-5,5) - this.velocity.x*4,
+      y: this.y + random(-5,5) - this.velocity.y*4,
+      dimX: this.dimX,
+      dimY: this.dimY,
+      vel: {
+        x: this.velocity.x/2 + random(this.velocity.x/8,-this.velocity.x/8,{round: false}),
+        y: this.velocity.y/2 + random(this.velocity.y/8,-this.velocity.y/8,{round: false}),
+      },
+      rot: random(0,PI*2,{round: false}),
+      rotSpeed: random(-0.05,0.05,{round: false,toFixed: 4}),
+      img: img,
+      life: life,
+      lifeInit: life,
+      currentStage: this.trail.sources.length - 1,
+      bornBySplitting: 0,
+      delete: false,
+    })
   }
   animate() {
     //make a nice clean and simple animation function, where duration is based on framerate, fuck off
@@ -1324,7 +1554,15 @@ class Img {
     
     return {curFrame: curFrame, nextFrame: nextFrame}
   }
+  update() {
+    if(this.isStatic) return
+    this.x += this.velocity.x
+    this.y += this.velocity.y
+    this.rotation += this.rotationSpeed
+  }
+
 }
+
 
 class MouseGlow {
   constructor(x,y,radius,ctx,mult) {
@@ -1752,33 +1990,36 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
         if(value == 'b2ctx'){ 
           value = b2ctx
           mult = bg2TransMult
-
+        }
+        if(value == 'b3ctx'){ 
+          value = b3ctx
+          mult = bg3TransMult
         }
         if(value == 'mctx') {
           value = mctx
           mult = mgTransMult
-
         }
         if(value == 'm2ctx'){ 
           value = m2ctx
           mult = mg2TransMult
-
         }
         if(value == 'tctx') {
           value = tctx
           mult = tTransMult
-
         }
         if(value == 'fctx') {
           value = fctx
           mult = fgTransMult
-
         }
         if(value == 'f2ctx'){ 
           value = f2ctx
           mult = fg2TransMult
         }
-        
+        if(value == 'f3ctx'){ 
+          value = f3ctx
+          mult = fg3TransMult
+        }
+      
         selected.forEach(obj=> {
           if(value == obj.ctx) return
           obj.x *= mult/obj.mult

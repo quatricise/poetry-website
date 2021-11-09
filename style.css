@@ -41,6 +41,9 @@ canvas {
 #canvas-fg2 {
   pointer-events: none;
 }
+#canvas-fg3 {
+  pointer-events: none;
+}
 
 #query-input {
   width: 300px;

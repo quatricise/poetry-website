@@ -18,6 +18,15 @@ let imgSources = {
   small_asteroid_2: {
     src: 'assets/small_asteroid_2.png'
   },
+  small_asteroid_3: {
+    src: 'assets/small_asteroid_3.png'
+  },
+  small_asteroid_4: {
+    src: 'assets/small_asteroid_4.png'
+  },
+  small_asteroid_5: {
+    src: 'assets/small_asteroid_5.png'
+  },
   small_asteroid_2_rot2: {
     src: 'assets/small_asteroid_2_rot2.png'
   },
@@ -143,6 +152,40 @@ let imgSources = {
   },
   s13_pressed_her_hand: {
     src: 'assets/s13_pressed_her_hand.png'
+  },
+  //comet
+  comet_body: {
+    src: 'assets/comet_body.png'
+  },
+  comet_trail1: {
+    src: 'assets/comet_trail1.png'
+  },
+  comet_trail2: {
+    src: 'assets/comet_trail2.png'
+  },
+  comet_trail3: {
+    src: 'assets/comet_trail3.png'
+  },
+  comet_trail4: {
+    src: 'assets/comet_trail4.png'
+  },
+  comet_trail5: {
+    src: 'assets/comet_trail5.png'
+  },
+  comet_trail6: {
+    src: 'assets/comet_trail6.png'
+  },
+  comet_trail7: {
+    src: 'assets/comet_trail7.png'
+  },
+  comet_trail8: {
+    src: 'assets/comet_trail8.png'
+  },
+  comet_trail9: {
+    src: 'assets/comet_trail9.png'
+  },
+  comet_trail10: {
+    src: 'assets/comet_trail10.png'
   },
 }
 
