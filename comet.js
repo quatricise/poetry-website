@@ -42,6 +42,8 @@ function spawnAsteroid() {
     new Img(
       x,
       y,
+      x,
+      y,
       size,
       size,
       rot,
@@ -104,6 +106,8 @@ function spawnComet() {
     new Img(
       x,
       y,
+      x,
+      y,
       size,
       size,
       rot,
@@ -117,8 +121,8 @@ function spawnComet() {
       false,
       false,
       undefined,
-      // `hue-rotate(${ random( 30, 50, { round: true } ) }deg) brightness(${ random( 0.5, 0.8, { toFixed: 2 } ) })`,
-      undefined,
+      `hue-rotate(${ random( 50, 60, { round: true } ) }deg) saturate(0.8) brightness(${ random( 0.4, 0.55, { toFixed: 2 } ) })`, //filter
+      // undefined, //filter
       false,
       false, //isStatic
       vel,

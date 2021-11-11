@@ -3,6 +3,7 @@ let controlsVisible = true;
 let graphics = 'medium';
 let userInteracted = false;
 let audioOn = false;
+let paused = false
 let lastTimestamp = 0;
 let isTitleVisible = true;
 let isTitleFading = false;
@@ -21,7 +22,7 @@ let scrollVelocity = 0
 let scrollFriction = 0.08
 let mainTimer = [0,60]
 let movedTimer = [0,60*8]
-let cometSpawnTimer = [0,25]
+let cometSpawnTimer = [0,15]
 let timers = [
   mainTimer,
   movedTimer,
@@ -49,15 +50,17 @@ let queryBox = document.querySelector('#query-box')
 let changelogContainer = document.querySelector('#changelog')
 let changelogHandle = document.querySelector('#handle')
 
+if(localStorage.getItem('changelog left')) {
+  changelogContainer.style.left = localStorage.getItem('changelog left')
+}
+if(localStorage.getItem('changelog top')) {
+  changelogContainer.style.top = localStorage.getItem('changelog top')
+}
+
 let movingChangelog = false;
 let viewChangesBtn = document.querySelector('#view-changes-btn')
 viewChangesBtn.addEventListener('click', function() {
   viewChanges()
-})
-
-let saveChangesBtn = document.querySelector('#save-changes-btn')
-saveChangesBtn.addEventListener('click', function() {
-  saveChanges()
 })
 
 let hideObjectBtn = document.querySelector('#hide-object-btn')
@@ -71,6 +74,9 @@ deleteObjectBtn.addEventListener('click', function() {
     deleteObject(obj)
   )
 })
+
+let selectedLabel = document.querySelector('#selected-count')
+
 let hintContainer = document.querySelector('#hint-overlay')
 
 
@@ -238,8 +244,11 @@ bothAxisCheckbox.addEventListener('change', function() {
 })
 
 document.addEventListener('keydown', function (e) {
-  if(e.code == 'Digit1') debug = !debug
-  if(e.code == 'Backquote') showControls()
+  if(e.code == 'F1') {
+    e.preventDefault()
+  }
+  if(e.code == bindings.debug) debug = !debug
+  if(e.code == bindings.showControls) showControls()
   if(e.code == 'ControlLeft') {
     pressedCtrl = true
     changingXforSelected = true
@@ -249,7 +258,7 @@ document.addEventListener('keydown', function (e) {
   if(e.code == 'ShiftLeft') {
     pressedShift = true
   }
-  if(e.code == 'KeyT') {
+  if(e.code == bindings.focusQuery) {
     if(document.activeElement !== queryInput) {
       setTimeout(()=> {
         queryInput.focus();
@@ -259,45 +268,70 @@ document.addEventListener('keydown', function (e) {
   }
   if(document.activeElement != queryInput) {
     
-    if(e.code == 'KeyH' && selected) {
+    if(e.code == bindings.hide && selected) {
       selected.forEach((obj)=> obj.hidden = !obj.hidden)
     }
-    if(e.code == 'KeyC' && (changingXforSelected || changingYforSelected || changingRotforSelected) && selected) {
+    if(e.code == bindings.cancel && (changingXforSelected || changingYforSelected || changingRotforSelected) && selected) {
       changingXforSelected = false
       changingYforSelected = false
       changingRotforSelected = false
       selected.forEach((obj,index)=> {
         obj.x = selectedCoordsBackup[index].x
         obj.y = selectedCoordsBackup[index].y
+        obj.spawnX = selectedCoordsBackup[index].spawnX
+        obj.spawnY = selectedCoordsBackup[index].spawnY
       })
   
     }
-    if(e.code == 'KeyX') {
+    if(e.code == bindings.delete) {
       selected.forEach(obj=> deleteObject(obj))
     }
-    if(e.code == 'KeyZ' || e.code == 'KeyY' ) {
+    if(e.code == bindings.resetDimensions) {
+      selected.forEach(obj=> {
+        if(obj.objectType == 'img') resetDimensions(obj)
+      })
+    }
+    if(e.code == bindings.resetAspectRatio) {
+      selected.forEach(obj=> {
+        if(obj.objectType == 'img') resetAspectRatio(obj)
+      })
+    }
+    if(e.code == bindings.selectVisible) {
+      deselect()
+      objects.forEach(obj=> {
+        if(obj.visible) {
+          selectObject("by mouse", obj, { selectMultiple: true });
+        }
+      })
+    }
+    if(e.code == bindings.undo || e.code == bindings.undo2 ) {
       undo()
     }
-    if(e.code == 'KeyS') {
+    if(e.code == bindings.save) {
       let objs = objects.filter(obj=> !obj.comet)
       // console.log(objs)
       exportToJsonFile(objs)
     }
-    if(e.code == 'KeyP') {
-      cancelAnimationFrame(drawloop)
+    if(e.code == bindings.pause) {
+      paused = !paused
+      if(paused) cancelAnimationFrame(drawloop)
+      else draw()
     }
-    if(e.code == 'KeyD' && selected) {
+    if(e.code == bindings.dupe && selected) {
       selected.forEach((obj,index)=> duplicateObject(selected[index]))
     }
-    if(e.code == 'Escape' && selected) {
+    if(e.code == bindings.deselect && selected) {
       selected.forEach(obj=> deselect())
     }
-    if(e.code == 'Space') {
+    if(e.code == bindings.shake) {
       particles.forEach(part=> {
         part.velX += Math.random()*4 - 2
         part.velY += Math.random()*4 - 2
       })
       shakeCamera(10,260)
+    }
+    if(e.code == bindings.viewChanges) {
+      viewChanges()
     }
   }
 
@@ -367,6 +401,7 @@ function moveObject(e) {
       let dx = e.clientX - mouseNow.x
       selected.forEach(obj=> {
         obj.x += dx * obj.mult
+        obj.spawnX += dx * obj.mult
       })
       labelX.innerHTML = selected[selected.length - 1].x
       
@@ -374,15 +409,17 @@ function moveObject(e) {
         let dy = e.clientY - mouseNow.y
         selected.forEach(obj=> {
           obj.y += dy * obj.mult
+          obj.spawnY += dy * obj.mult
         })
         labelY.innerHTML = selected[selected.length - 1].y
       }
-
+      
     }
     if(changingYforSelected) {
       let dy = e.clientY - mouseNow.y
       selected.forEach(obj=> {
         obj.y += dy * obj.mult
+        obj.spawnY += dy * obj.mult
       })
       labelY.innerHTML = selected[selected.length - 1].y
       
@@ -390,6 +427,7 @@ function moveObject(e) {
         let dx = e.clientX - mouseNow.x
         selected.forEach(obj=> {
           obj.x += dx * obj.mult
+          obj.spawnX += dx * obj.mult
         })
         labelX.innerHTML = selected[selected.length - 1].x
       }
@@ -407,6 +445,8 @@ function moveObject(e) {
   if(movingChangelog) {
     changelogContainer.style.left = Math.max(Math.min(e.clientX - 12,cw - 300), 0) + 'px'
     changelogContainer.style.top = Math.max(Math.min(e.clientY - 12,ch - 35), 0) + 'px'
+    localStorage.setItem('changelog left', changelogContainer.style.left)
+    localStorage.setItem('changelog top', changelogContainer.style.top)
   }
 
   mouseNow = {
@@ -615,7 +655,7 @@ function draw(currentTimestamp) {
   // update
 
   objects.forEach(obj=> {
-    obj.update()
+    if(obj.hidden == false) obj.update()
   })
 
   images.forEach(img=> {
@@ -820,7 +860,7 @@ function drawBg(ctx,mult, options = {opacity: 1}) {
 
 let starProperties = {
   density: 15, // per grid cell
-  colors: ['hsl(224,25%,20%)','hsl(272,13%,38%)','hsl(320,60%,25%)','hsl(240,23%,28%)'],
+  colors: ['hsl(224,25%,20%)','hsl(272,13%,32%)','hsl(320,60%,25%)','hsl(240,23%,28%)'],
   radius: 1.2,
   radiusRange: 0.3,
 }
@@ -1170,7 +1210,10 @@ class TextObject {
 
 class Img {
   constructor(
-    x,y,
+    x,
+    y,
+    spawnX = 0,
+    spawnY = 0,
     dimX,dimY,
     rotation = 0,
     src, 
@@ -1201,10 +1244,14 @@ class Img {
     this.id = id
     this.dimX = dimX
     this.dimY = dimY
-    this.x = x
-    this.y = y
+    this.x = spawnX
+    this.y = spawnY
+    this.spawnX = spawnX
+    this.spawnY = spawnY
     this.hidden = false
     this.rotation = rotation // using radians everywhere
+    this.rotOffset = 0 // in radians
+    this.rotationSpeed = rotationSpeed // in radians
     this.src = src
     this.img = new Image()
     this.img.src = src
@@ -1244,7 +1291,6 @@ class Img {
     this.comet = comet
     this.hasTrail = hasTrail
     this.trail = trail
-    this.rotationSpeed = rotationSpeed
     this.objectType = "img"
     objects.push(this)
     initialValues.push({
@@ -1342,7 +1388,7 @@ class Img {
     //draw the actual image
     this.ctx.save()
     this.ctx.translate(this.x,this.y)
-    this.ctx.rotate(this.rotation)
+    this.ctx.rotate(this.rotation + this.rotOffset)
     if(!this.animated) {
       this.ctx.globalAlpha = this.opacity*this.maxOpacity
       this.ctx.drawImage(this.img, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
@@ -1359,7 +1405,7 @@ class Img {
     if(this.shadow) {
       this.ctx.save()
       this.ctx.translate(this.x,this.y)
-      this.ctx.rotate(this.rotation)
+      this.ctx.rotate(this.rotation + this.rotOffset)
       this.ctx.filter = 'brightness(1)'
       this.ctx.globalAlpha = 1
       this.ctx.drawImage(this.shadow, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
@@ -1453,7 +1499,7 @@ class Img {
             let vel = vectorRotate(
               child.vel.x / 2,
               child.vel.y / 2,
-              (i * random(60, 120, { round: true }) * PI) / 180
+              (i * random(70, 90, { round: true }) * PI) / 180
             )
             this.trail.children.push({
               x: child.x + posRand,
@@ -1558,7 +1604,7 @@ class Img {
     if(this.isStatic) return
     this.x += this.velocity.x
     this.y += this.velocity.y
-    this.rotation += this.rotationSpeed
+    this.rotOffset += this.rotationSpeed
   }
 
 }
@@ -1817,19 +1863,6 @@ function viewChanges() {
   })
 }
 
-function saveChanges() {
-  records.forEach(rec=> {
-    let dataset = rec.querySelector('.data').dataset
-    localStorage.setItem(dataset.id + ' x', dataset.x)
-    localStorage.setItem(dataset.id + ' y', dataset.y)
-    if(dataset.hidden != undefined) localStorage.setItem(dataset.id + ' hidden', dataset.hidden)
-    if(dataset.dimx != undefined) localStorage.setItem(dataset.id + ' dimX', dataset.dimx)
-    if(dataset.dimy != undefined) localStorage.setItem(dataset.id + ' dimY', dataset.dimy)
-
-    rec.style.backgroundColor = 'hsl(85,30%,65%)'
-  })
-}
-
 function restoreToInitial(src) {
   let target = objects.filter(obj=> obj.id == src.querySelector('.data').dataset.id).shift()
   let initial = initialValues.filter(obj=> obj.id == target.id).shift()
@@ -1844,7 +1877,12 @@ function backupCoords() {
   if(selected && (selectedCoordsBackup.length < 1)) {
 
     selected.forEach(obj=> {
-      selectedCoordsBackup.push({x: obj.x,y: obj.y})
+      selectedCoordsBackup.push({
+        x: obj.x,
+        y: obj.y,
+        spawnX: obj.spawnX,
+        spawnY: obj.spawnY,
+      });
     })
     
     console.log(selectedCoordsBackup)
@@ -1956,7 +1994,12 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
       }
       selected.push(match)
       match.selected = true
-      selectedCoordsBackup.push({x: match.x,y: match.y})
+      selectedCoordsBackup.push({ 
+        x: match.x, 
+        y: match.y,
+        spawnX: match.spawnX, 
+        spawnY: match.spawnY, 
+      });
     }
   }
 
@@ -1979,8 +2022,25 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
       let dividerIndex = query.search("-")
       let property = query.substring(indexStart + 1, dividerIndex)
       let value = query.substring(dividerIndex + 1, query.length)
-      if( property == 'x' || property == 'y' || property == 'dimX' || property == 'dimY' || property == 'rotation' || property == 'maxOpacity'|| property == 'opacity' ) value = +value
-      if( property == 'animated' || property == 'chainlink' || property == 'glowUnderCursor') value = !!value
+      var additionalProperties = []
+      if( property == 'x' || property == 'y' || property == 'dimX' || property == 'dimY' || property == 'rotation' || property == 'rotationSpeed' || property == 'maxOpacity'|| property == 'opacity' ) {
+        value = +value
+        if(isNaN(value)) {
+          alert('Stop inputting rubbish numbers..')
+          return
+        }
+      }
+      if( property == 'rotationSpeed' || property == 'rotation') {
+        value = value*PI/180
+      }
+      if( property == 'rotationSpeed' && Math.abs(value) > 0 ) {
+        additionalProperties.push({property: 'isStatic', value: false})
+      }
+      if( property == 'animated' || property == 'chainlink' || property == 'glowUnderCursor' || property == 'isStatic' ) {
+        if(value == 'false') value = false
+        if(value == 'true') value = true
+      }
+
       if( property == 'ctx' ) {
         let mult;
         if(value == 'bctx') {
@@ -2022,8 +2082,14 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
       
         selected.forEach(obj=> {
           if(value == obj.ctx) return
+          // obj.x += cw + cw/2*mult
+          // obj.y += ch + ch/2*mult
           obj.x *= mult/obj.mult
           obj.y *= mult/obj.mult
+          obj.spawnX *= mult/obj.mult
+          obj.spawnY *= mult/obj.mult
+          // obj.x -= cw - cw/2*mult
+          // obj.y -= ch - ch/2*mult
           obj.mult = mult
         })
         
@@ -2032,13 +2098,68 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
       if( property == 'src' ) {
         value = 'assets/' + value + '.png'
         selected.forEach(obj=> {
-          obj.img.src = value
+          replaceSrc(obj,value)  
         })
       }
       selected.forEach(obj=> {
         obj[property] = value
+        additionalProperties.forEach(prop=> {
+          obj[prop.property] = prop.value
+        })
       })
       console.log(indexStart,dividerIndex,property,value)
+    }
+    else if(query.search("add:","") != -1) {
+        let indexStart = query.search(":")
+        let dividerIndex = query.search("-")
+        let divider2Index = query.search(",")
+        let type = query.substring(indexStart + 1, dividerIndex)
+        let name = query.substring(dividerIndex + 1, divider2Index)
+        let src = 'assets/' + name + '.png'
+        let ctx = query.substring(divider2Index + 1, query.length)
+        if(type == 'img') {
+          let mult;
+          if(ctx == 'bctx') {
+            ctx = bctx
+            mult = bgTransMult
+          }
+          if(ctx == 'b2ctx'){ 
+            ctx = b2ctx
+            mult = bg2TransMult
+          }
+          if(ctx == 'b3ctx'){ 
+            ctx = b3ctx
+            mult = bg3TransMult
+          }
+          if(ctx == 'mctx') {
+            ctx = mctx
+            mult = mgTransMult
+          }
+          if(ctx == 'm2ctx'){ 
+            ctx = m2ctx
+            mult = mg2TransMult
+          }
+          if(ctx == 'tctx') {
+            ctx = tctx
+            mult = tTransMult
+          }
+          if(ctx == 'fctx') {
+            ctx = fctx
+            mult = fgTransMult
+          }
+          if(ctx == 'f2ctx'){ 
+            ctx = f2ctx
+            mult = fg2TransMult
+          }
+          if(ctx == 'f3ctx'){ 
+            ctx = f3ctx
+            mult = fg3TransMult
+          }
+          addImage(src,ctx,mult,name)
+          // console.log(type)
+          // console.log(src)
+          // console.log(ctx)
+        }
     }
     else {
       query = query.split(",")
@@ -2067,12 +2188,27 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
     labelX.innerHTML = match.x
     labelY.innerHTML = match.y
     idDisplay.innerHTML = match.id
+    selectedLabel.innerHTML = 'Selected: ' + selected.length
   }
   console.log(match)
 }
 
 function deselect() {
+  selected.forEach(obj=> {
+    obj.x = Math.floor(obj.x)
+    obj.y = Math.floor(obj.y)
+  })
   selected = []
+  selectedLabel.innerHTML = 'Selected: ' + selected.length
+}
+
+function resetDimensions(obj) {
+  obj.dimX = obj.img.naturalWidth
+  obj.dimY = obj.img.naturalHeight
+}
+function resetAspectRatio(obj) {
+  let xToY = obj.img.naturalWidth / obj.img.naturalHeight
+  obj.dimX = Math.round(obj.dimY * xToY)
 }
 
 let objectHistory = []
@@ -2082,6 +2218,8 @@ function duplicateObject(obj) {
     var img = new Img(
       obj.x,
       obj.y,
+      obj.spawnX,
+      obj.spawnY,
       obj.dimX,
       obj.dimY,
       obj.rotation,
@@ -2096,7 +2234,14 @@ function duplicateObject(obj) {
       obj.animated,
       obj.animation,
       obj.filter,
-      obj.chainlink)
+      obj.chainlink,
+      obj.isStatic,
+      obj.velocity,
+      obj.comet,
+      obj.rotationSpeed,
+      obj.hasTrail,
+      obj.trail
+      )
 
     if(obj.instanceOf) {
       img.id = obj.instanceOf + Math.floor(Math.random()*1_000_000_000)
@@ -2143,6 +2288,14 @@ function shakeCamera(amount,duration) {
   setTimeout(() => {
     clearInterval(cameraShakeInterval)
   }, duration);
+  images.forEach(img=> {
+    if(img.comet) {
+      img.velocity.x = clamp(random(-(Math.abs(img.velocity.x)*2),Math.abs(img.velocity.x)*2),-4,4)
+      img.velocity.y = clamp(random(-(Math.abs(img.velocity.y)*2),Math.abs(img.velocity.y)*2),-4,4)
+      if(Math.abs(img.velocity.x) < 0.5) img.velocity.x = pickRandom([-2,-1,-0.5,0.5,1,2])
+      if(Math.abs(img.velocity.y) < 0.5) img.velocity.y = pickRandom([-2,-1,-0.5,0.5,1,2])
+    }
+  })
 }
 
 function init() {
@@ -2207,7 +2360,41 @@ function drawDebugInfo(fps,) {
 
 }
 
-
+function addImage(src,ctx,mult,name) {
+  let img = new Image()
+  img.src = src
+  img.onload = ()=> {
+      let spawnPos = {
+        x: -globalTranslate.x*mult + cw/2,
+        y: -globalTranslate.y*mult + ch/2,
+      }
+      let newImage = new Img(
+        spawnPos.x,
+        spawnPos.y,
+        spawnPos.x,
+        spawnPos.y,
+        img.naturalWidth,
+        img.naturalHeight,
+        0,
+        src,
+        ctx,
+        mult,
+        name + random(0,1_000_000_000)
+      )
+      images.push(newImage)
+      deselect()
+      selected.push(newImage)
+  }
+}
+function replaceSrc(target,sourcePath) {
+  let img = new Image()
+  img.src = sourcePath
+  img.onload = ()=> {
+    target.img.src = img.src
+    target.dimX = img.naturalWidth
+    target.dimY = img.naturalHeight
+  }
+}
 
 //music system
 

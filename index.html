@@ -19,7 +19,7 @@
   <canvas id="canvas-fg"></canvas>
   <canvas id="canvas-fg2"></canvas>
   <div class="input-cont hidden" id="query-box">
-    <input type="text" id="query-input">
+    <input type="text" id="query-input" autocomplete="off">
     <div class="id-display" id="selected-object-id"></div>
     <div class="slider-cont">
       <span class="slider-label">x:</span>
@@ -41,11 +41,14 @@
       <label for="both-axis-checkbox" class="slider-label">Change both axis.</label>
     </div>
     <div class="slider-cont">
-      <div class="button" id="view-changes-btn">View changes</div>
-      <div class="filler"></div>
-      <div class="button" id="hide-object-btn">Hide</div>
-      <div class="filler"></div>
-      <div class="button" id="delete-object-btn">Delete</div>
+      <span class="slider-label" id="selected-count">Selected: 0</span>
+    </div>
+    <div class="slider-cont">
+      <div class="button hidden" id="view-changes-btn">View changes</div>
+      <div class="filler hidden"></div>
+      <div class="button hidden" id="hide-object-btn">Hide</div>
+      <div class="filler hidden"></div>
+      <div class="button hidden" id="delete-object-btn">Delete</div>
     </div>
   </div>
 
@@ -53,18 +56,11 @@
     <div class="header">
       <div class="handle" id="handle">|||</div>
       <h3 class="heading-small">Changed objects:</h3>
-      <div class="filler"></div>
-      <div id="save-changes-btn">Save changes</div>
+      <!-- <div class="filler"></div> -->
+      <!-- <div id="save-changes-btn">Save changes</div> -->
     </div>
   </div>
   <div class="title-screen">
-    <!-- <canvas id="canvas-title"></canvas>
-    <div class="text">
-      <h4>John Keats</h4>
-      <h1>Hyperion</h1>
-      <div class="divider"></div>
-      <h2>Book I</h2>
-    </div> -->
   </div>
   <div class="hint-overlay" id="hint-overlay"></div>
   <script src="//cdnjs.cloudflare.com/ajax/libs/gsap/3.8.0/gsap.min.js" integrity="sha512-eP6ippJojIKXKO8EPLtsUMS+/sAGHGo1UN/38swqZa1ypfcD4I0V/ac5G3VzaHfDaklFmQLEs51lhkkVaqg60Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -77,6 +73,7 @@
   <script src="read_object_data.js"></script>
   <script src="math_stuff.js"></script>
   <script src="comet.js"></script>
+  <script src="bindings.js"></script>
   <script src="canvas.js"></script>
 </body>
 </html>

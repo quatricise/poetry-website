@@ -30,6 +30,8 @@ function readObjectData() {
     if(obj.objectType == 'img') images.push(new Img(
       obj.x,
       obj.y,
+      obj.spawnX,
+      obj.spawnY,
       obj.dimX,
       obj.dimY,
       obj.rotation,
@@ -47,6 +49,10 @@ function readObjectData() {
       obj.chainlink,
       obj.isStatic,
       obj.velocity,
+      obj.comet,
+      obj.rotationSpeed,
+      obj.hasTrail,
+      obj.trail
     ))
     if(obj.objectType == 'textObject') textObjects.push(new TextObject(
       obj.x,
