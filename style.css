@@ -3,6 +3,11 @@
   src: url(fonts/andada_pro/andada_variable.ttf);
   font-display: swap;
 }
+@font-face {
+  font-family: 'andada italic';
+  src: url(fonts/andada_pro/andada_italic_variable.ttf);
+  font-display: swap;
+}
 
 * {
   box-sizing: border-box;

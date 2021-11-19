@@ -31,7 +31,8 @@ let imgSources = {
     src: 'assets/small_asteroid_2_rot2.png'
   },
   cloud_large_1: {
-    src: 'assets/cloud_large_1.png'
+    src: 'assets/cloud_large_1.png',
+    shadowSrc: 'assets/cloud_large_1_shadow.png'
   },
   cloud_small_1: {
     src: 'assets/cloud_small_1.png'
@@ -111,6 +112,15 @@ let imgSources = {
   s7_unsceptered: {
     src: 'assets/s7_unsceptered.png'
   },
+  s7_unsceptered_frame1: {
+    src: 'assets/s7_unsceptered_frame1.png'
+  },
+  s7_unsceptered_frame2: {
+    src: 'assets/s7_unsceptered_frame2.png'
+  },
+  s7_unsceptered_frame3: {
+    src: 'assets/s7_unsceptered_frame3.png'
+  },
   s8_no_force: {
     src: 'assets/s8_no_force.png'
   },
@@ -187,6 +197,9 @@ let imgSources = {
   comet_trail10: {
     src: 'assets/comet_trail10.png'
   },
+  pointer_hand: {
+    src: 'assets/pointer_hand.png'
+  }
 }
 
 let particleGenerators = [
@@ -211,6 +224,18 @@ let particleGenerators = [
     color: 'hsl(250,10%,75%)',
     lifeMin: 60*6,
     lifeMax: 60*12,
+    force: undefined,
+    velRange: undefined,
+  },
+  {
+    parent: 's4grassfg', // by object id from objects inside objects []
+    offset: [ 0, 0 ], // offset the center of the generator by x and y
+    spawnRate: 60,
+    spawnChance: 0.2,
+    spawnRange: 400,
+    color: 'hsla(250,0%,85%,0.5)',
+    lifeMin: 60*5,
+    lifeMax: 60*8,
     force: undefined,
     velRange: undefined,
   },
@@ -274,26 +299,26 @@ let particleGenerators = [
       yMin: -0.5
     },
   },
-  {
-    parent: 's5naiad',
-    offset: [0,0],
-    spawnRate: 120,
-    spawnChance: 0.2,
-    spawnRange: 100,
-    color: 'hsla(0,0%,100%,0.5)',
-    lifeMin: 60*4,
-    lifeMax: 60*6,
-    force: {
-      x: 0.01,
-      y: 0.002,
-    },
-    velRange: {
-      xMax: 0.2,
-      xMin: -0.1,
-      yMax: -0.2,
-      yMin: -0.5
-    },
-  },
+  // {
+  //   parent: 's5naiad',
+  //   offset: [0,0],
+  //   spawnRate: 120,
+  //   spawnChance: 0.2,
+  //   spawnRange: 100,
+  //   color: 'hsla(0,0%,100%,0.5)',
+  //   lifeMin: 60*4,
+  //   lifeMax: 60*6,
+  //   force: {
+  //     x: 0.01,
+  //     y: 0.002,
+  //   },
+  //   velRange: {
+  //     xMax: 0.2,
+  //     xMin: -0.1,
+  //     yMax: -0.2,
+  //     yMin: -0.5
+  //   },
+  // },
   {
     parent: 's6sand_fill',
     offset: [-100,300],

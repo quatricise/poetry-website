@@ -52,7 +52,8 @@ function readObjectData() {
       obj.comet,
       obj.rotationSpeed,
       obj.hasTrail,
-      obj.trail
+      obj.trail,
+      obj.showBaseImg
     ))
     if(obj.objectType == 'textObject') textObjects.push(new TextObject(
       obj.x,
@@ -61,7 +62,11 @@ function readObjectData() {
       ctx,
       obj.mult,
       obj.id,
-      obj.font
+      obj.font,
+      obj.fontSize,
+      obj.isStatic,
+      obj.hidden,
+      obj.trigger
     ))
   })
 

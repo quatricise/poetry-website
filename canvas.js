@@ -1,12 +1,16 @@
 let debug = false;
-let controlsVisible = true;
+let controlsVisible = false;
 let graphics = 'medium';
+let spawnThings = true;
 let userInteracted = false;
+let userReachedEnd = false;
+let firstTimeVisit = true;
 let audioOn = false;
 let paused = false
 let lastTimestamp = 0;
 let isTitleVisible = true;
 let isTitleFading = false;
+
 const PI = Math.PI
 
 const userUnderstand = {
@@ -200,23 +204,30 @@ let dragMultiplier = 1
 let textColor = 'hsl(0,0%,98%)'
 let lineHeight = 35
 let mainfont;
+let mainFontSize = 22;
 
 
+//horribleness
+let pointerHand = new Image()
+pointerHand.src = 'assets/pointer_hand.png'
+let cursorAlphaDefault = 0.2
 //load content 
 async function loadFonts() {
 
-  var font1 = new FontFace('andada', 'url(/fonts/andada_pro/andada_italic_variable.ttf)');
+  var font1 = new FontFace('andada', 'url(./fonts/andada_pro/andada_italic_variable.ttf)');
   await font1.load()
-
+  
   // Ready to use the font in a canvas context
   console.log('Fonts ready.');
   
   // Add font on the html page
   document.fonts.add(font1);
   
-  mainfont = '22px andada';
+  mainfont = 'andada';
 }
 loadFonts()
+
+
 let imageKeys = Object.keys(imgSources)
 let imageCount = imageKeys.length
 // console.log(imageCount)
@@ -234,6 +245,7 @@ function loadProgress() {
   imagesLoaded++
   if(imagesLoaded == imageCount) {
     console.log('all images from imgSources are loaded')
+    init()
   }
 }
 
@@ -538,6 +550,19 @@ let movingCanvas = false
 
 canvasText.addEventListener('mousedown', function (e) {
   mousedown = true
+  if(
+    textObjects.filter(obj=>obj.trigger.active).length > 0 &&
+    !(pressedShift || pressedCtrl) 
+  ) {
+    let anchor = textObjects.filter(obj=>obj.trigger.active).shift()
+    let newWindow = window.open('fullpoem/index.html','_blank')
+    newWindow.onload = ()=> {
+      newWindow.document.querySelector(`#${anchor.trigger.target}`).classList.remove('hidden')
+    }
+    return
+  }
+
+
   movingCanvas = true
   mouseNow = {
     x: e.clientX,
@@ -570,7 +595,6 @@ let decreaseMaxOpacityOverTimeTimer;
 let chainlinksInvisibleTimer = 0
 let decreasingChainlinkOpacity = false
 function moveCanvas(e, offset) {
-  // clearInterval(decreaseMaxOpacityOverTimeTimer)
   chainlinksInvisibleTimer++
   if(!decreasingChainlinkOpacity) {
     decreasingChainlinkOpacity = true;
@@ -593,6 +617,7 @@ function moveCanvas(e, offset) {
   
   let dx;
   let dy;
+  
   if(e) {
     dx = e.clientX - mouseNow.x
     dy = e.clientY - mouseNow.y
@@ -603,6 +628,16 @@ function moveCanvas(e, offset) {
   }
   dx *= dragMultiplier
   dy *= dragMultiplier
+
+  //end limiter
+  if(Math.abs(globalTranslate.y) >= 19500 && dy < 0) {
+    dy = 0
+    if(userReachedEnd == false) {
+      // showEnding()
+      userReachedEnd = true
+    }
+  }
+
   bctx.translate(dx * bgTransMult,  dy * bgTransMult)
   b2ctx.translate(dx * bg2TransMult,  dy * bg2TransMult)
   b3ctx.translate(dx * bg3TransMult,  dy * bg3TransMult)
@@ -653,6 +688,9 @@ function draw(currentTimestamp) {
 
 
   // update
+  textObjects.forEach(obj=> {
+    obj.detectMouseOver()
+  })
 
   objects.forEach(obj=> {
     if(obj.hidden == false) obj.update()
@@ -721,7 +759,7 @@ function draw(currentTimestamp) {
   localStorage.setItem('globalTranslateX', globalTranslate.x)
   localStorage.setItem('globalTranslateY', globalTranslate.y)
 
-  if(mainTimer[0] == mainTimer[1]) {
+  if(mainTimer[0] == mainTimer[1] && spawnThings) {
     let chance = random(0,100)
     if(chance > 85 && chance <= 96) {
       spawnAsteroid()
@@ -831,6 +869,13 @@ function draw(currentTimestamp) {
     tctx.restore()
   }
   drawSelectionCursor()
+
+  if(textObjects.filter(obj=> obj.trigger.active == true).length > 0) {
+    drawPointer(clamp(cursorAlphaDefault*2,0,1))
+  }
+  // else {
+  //   drawPointer(cursorAlphaDefault)
+  // }
 
   drawloop = requestAnimationFrame(draw)
   
@@ -1121,90 +1166,137 @@ class Hint {
 }
 
 class TextObject {
-  constructor(x,y,text,ctx,mult, id = Math.floor(Math.random()*1_000_000_000),font = undefined,isStatic = true) {
-    this.id = id
-    // this.x = text[0][0]
-    // this.y = text[0][1]
-    this.x = x
-    this.y = y
-    this.hidden = false
-    this.text = text
-    this.ctx = ctx
-    this.mult = mult
-    this.font = font
-    this.visible = false
-    this.selected = false
-    this.isStatic = isStatic
-    this.objectType = "textObject"
-    objects.push(this)
+  constructor(
+    x,
+    y,
+    text,
+    ctx,
+    mult,
+    id = Math.floor(Math.random() * 1_000_000_000),
+    font = mainfont,
+    fontSize = mainFontSize,
+    isStatic = true,
+    hidden = false,
+    trigger = {
+      type: 'none',
+      area: [0,0],
+      active: false,
+      target: ''
+    },
+  ) {
+    this.id = id;
+    this.x = x;
+    this.y = y;
+    this.hidden = hidden;
+    this.text = text;
+    this.ctx = ctx;
+    this.mult = mult;
+    this.font = font;
+    this.fontSize = fontSize
+    this.visible = false;
+    this.selected = false;
+    this.isStatic = isStatic;
+    this.objectType = "textObject";
+    this.trigger = trigger;
+    this.fontMult = 1
+    objects.push(this);
     initialValues.push({
-      id: this.id, 
-      x: this.x, 
-      y: this.y, 
+      id: this.id,
+      x: this.x,
+      y: this.y,
       hidden: this.hidden,
-    })
+    });
   }
   draw() {
-    if(this.hidden) return
-    this.ctx.save()
-    let textdist = Math.hypot(this.x + 100 - center.x,this.y + 50 - center.y) //bodge , okay this is gonna be a classic bodge, the bodgiest of all, just hardcode an offset here, nice
-    let segment = 80/Math.min(cw,ch)
-    let alpha = 1 - segment*textdist/100 + segment/2
-    if(alpha > 0) {
-      this.ctx.globalAlpha = alpha
-    }
-    else {
-      this.ctx.globalAlpha = 0
+    if (this.hidden) return;
+    this.ctx.save();
+    let textdist = Math.hypot(this.x + 100 - center.x, this.y + 50 - center.y); //bodge , okay this is gonna be a classic bodge, the bodgiest of all, just hardcode an offset here, nice
+    let segment = 80 / Math.min(cw, ch);
+    let alpha = 1 - (segment * textdist) / 100 + segment / 2;
+    if (alpha > 0) {
+      this.ctx.globalAlpha = alpha;
+    } else {
+      this.ctx.globalAlpha = 0;
     }
 
-    if((matchedObject == this && pressedShift) || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
-      this.ctx.save()
-      if(pressedCtrl) this.ctx.strokeStyle = 'white'
-      else this.ctx.strokeStyle = 'blue'
-      this.ctx.strokeRect(this.x,this.y,300,160)
-      this.ctx.fillStyle = 'hsla(0,0%,100%,0.1)'
-      this.ctx.beginPath()
-      this.ctx.arc(
+    if (
+      (matchedObject == this && pressedShift) ||
+      (selected.filter((obj) => obj.id == this.id).length > 0 && pressedCtrl)
+    ) {
+      this.ctx.save();
+      if (pressedCtrl) this.ctx.strokeStyle = "white";
+      else this.ctx.strokeStyle = "blue";
+      this.ctx.strokeRect(this.x, this.y, 300, 160);
+      this.ctx.fillStyle = "hsla(0,0%,100%,0.1)";
+      this.ctx.beginPath();
+      this.ctx.arc(this.x, this.y, 50, 0, PI * 2, false);
+      this.ctx.closePath();
+      this.ctx.fill();
+      if (pressedCtrl) this.ctx.filter = "";
+      else this.ctx.filter = "brightness(1.5)";
+    }
+    // draw the actual text
+    this.ctx.fillStyle = textColor;
+    this.ctx.font = this.fontSize*this.fontMult + 'px' + ' ' + this.font
+    for (let i = 0; i < this.text.length; i++) {
+      this.ctx.fillText(
+        this.text[i],
         this.x,
-        this.y,
-        50,
-        0,PI*2,false
-        )
-        this.ctx.closePath()
-        this.ctx.fill()
-        if(pressedCtrl) this.ctx.filter = ''
-        else this.ctx.filter = 'brightness(1.5)'
-      }
-      
-    this.ctx.fillStyle = textColor
-    this.ctx.font = this.font || mainfont
-    for (let i = 1; i < this.text.length; i++) {
-      this.ctx.fillText(this.text[i],this.x,this.y + lineHeight*i - lineHeight)
+        this.y + lineHeight * (i+2) - lineHeight
+      );
     }
 
-    if(matchedObject == this && pressedShift || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
-      this.ctx.restore()
+    if (
+      (matchedObject == this && pressedShift) ||
+      (selected.filter((obj) => obj.id == this.id).length > 0 && pressedCtrl)
+    ) {
+      this.ctx.restore();
     }
 
-    if(debug || pressedShift) {
-      this.ctx.save()
-      if(selectedObject == this) this.ctx.fillStyle = 'red'
-      else this.ctx.fillStyle = 'white'
-      this.ctx.fillRect(this.x - 6,this.y - 6,12,12)
-      this.ctx.restore()
+    if (debug || pressedShift) {
+      this.ctx.save();
+      if (selectedObject == this) this.ctx.fillStyle = "red";
+      else this.ctx.fillStyle = "white";
+      this.ctx.fillRect(this.x - 6, this.y - 6, 12, 12);
+      this.ctx.restore();
     }
 
-    if(debug) {
-      this.ctx.fillStyle = 'hsl(0,0%,80%)'
-      this.ctx.font = '14px Arial'
-      this.ctx.fillText(`Id: ${this.id}`,this.x,this.y - lineHeight * 0.8)
+    if (debug) {
+      this.ctx.fillStyle = "hsl(0,0%,80%)";
+      this.ctx.font = "14px Arial";
+      this.ctx.fillText(`Id: ${this.id}`, this.x, this.y - lineHeight * 0.8);
       // this.ctx.fillText(`Text dist from center: ${textdist}`,this.x,this.y - lineHeight*2 * 0.8)
       // this.ctx.fillText(`Alpha value set to: ${1 - segment*textdist/100}`,this.x,this.y - lineHeight*3 * 0.8)
     }
-    this.ctx.restore()
+    this.ctx.restore();
   }
   update() {
-    if(this.isStatic) return
+    if (this.isStatic) return;
+  }
+  detectMouseOver() {
+    if(this.trigger.type != 'mouseover') return;
+
+    // let distances = []
+    // objects.forEach(obj=> {
+    //   let dist = Math.hypot(obj.x - mouseNow.x + globalTranslate.x*obj.mult,obj.y - mouseNow.y + globalTranslate.y*obj.mult)
+    //   distances.push(dist)
+    // })
+    // let closest = Math.min(...distances)
+    // let match = objects.filter(obj => Math.hypot(obj.x - mouseNow.x + globalTranslate.x*obj.mult,obj.y - mouseNow.y + globalTranslate.y*obj.mult) == closest)
+
+    if(
+      this.x - mouseNow.x + globalTranslate.x*this.mult <= 0 &&
+      this.x - mouseNow.x + globalTranslate.x*this.mult >= -this.trigger.area.width &&
+      this.y - mouseNow.y + globalTranslate.y*this.mult <= 0 &&
+      this.y - mouseNow.y + globalTranslate.y*this.mult >= -this.trigger.area.height
+    ) {
+      this.trigger.active = true
+      this.fontMult = 1.1
+    }
+    else {
+      this.trigger.active = false
+      this.fontMult = 1
+    }
   }
 }
 
@@ -1240,6 +1332,7 @@ class Img {
     rotationSpeed = 0,
     hasTrail = false,
     trail = undefined,
+    showBaseImg = true
     ) {
     this.id = id
     this.dimX = dimX
@@ -1255,6 +1348,7 @@ class Img {
     this.src = src
     this.img = new Image()
     this.img.src = src
+    this.shadowSrc = shadowSrc
     if(shadowSrc) {
       this.shadow = new Image()
       this.shadow.src = shadowSrc
@@ -1291,6 +1385,7 @@ class Img {
     this.comet = comet
     this.hasTrail = hasTrail
     this.trail = trail
+    this.showBaseImg = showBaseImg
     this.objectType = "img"
     objects.push(this)
     initialValues.push({
@@ -1389,7 +1484,14 @@ class Img {
     this.ctx.save()
     this.ctx.translate(this.x,this.y)
     this.ctx.rotate(this.rotation + this.rotOffset)
-    if(!this.animated) {
+    if(this.shadow) {
+      this.ctx.save()
+      this.ctx.filter = 'brightness(1)'
+      this.ctx.globalAlpha = 1
+      this.ctx.drawImage(this.shadow, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
+      this.ctx.restore()
+    }
+    if(this.showBaseImg) {
       this.ctx.globalAlpha = this.opacity*this.maxOpacity
       this.ctx.drawImage(this.img, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
     }
@@ -1402,15 +1504,6 @@ class Img {
     }
     this.ctx.restore()
     
-    if(this.shadow) {
-      this.ctx.save()
-      this.ctx.translate(this.x,this.y)
-      this.ctx.rotate(this.rotation + this.rotOffset)
-      this.ctx.filter = 'brightness(1)'
-      this.ctx.globalAlpha = 1
-      this.ctx.drawImage(this.shadow, 0 - this.dimX/2, 0 - this.dimY/2,this.dimX,this.dimY)
-      this.ctx.restore()
-    }
 
     if(this.glowUnderCursor) {
       this.ctx.restore()
@@ -1912,6 +2005,37 @@ function calcCenterForContext(ctx,mult) {
   return cntr
 }
 
+function drawPointer(maxAlpha) {
+  tctx.save()
+  let center =  {
+    x: mouseNow.x - globalTranslate.x,
+    y: mouseNow.y - globalTranslate.y,
+  }
+  let radius = 25
+  tctx.lineWidth = 2
+  tctx.strokeStyle = 'hsla(0,0%,100%,0.5)'
+  tctx.arc(center.x, center.y, radius, 0, PI * 2, false);
+
+  var gradient = tctx.createRadialGradient(center.x,center.y,1,center.x,center.y,radius)
+  gradient.addColorStop(0, `hsla(0,0%,100%,${maxAlpha})`);
+  gradient.addColorStop(0.25, `hsla(0,0%,100%,${maxAlpha/2})`)
+  gradient.addColorStop(0.5, `hsla(0,0%,100%,${maxAlpha/4})`)
+  gradient.addColorStop(0.75, `hsla(0,0%,100%,${maxAlpha/8})`)
+  gradient.addColorStop(1, `hsla(0,0%,100%,0)`)
+  tctx.fillStyle = gradient
+
+  tctx.fill()
+  // let w = pointerHand.naturalWidth
+  // let h = pointerHand.naturalHeight
+  // tctx.drawImage(
+  //   pointerHand, 
+  //   center.x - w, 
+  //   center.y - 8,
+  //   w,
+  //   h
+  // );
+  tctx.restore()
+}
 function drawSelectionCursor() {
   if(!pressedShift) return
   tctx.save()
@@ -2101,6 +2225,12 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
           replaceSrc(obj,value)  
         })
       }
+      if( property == 'shadowSrc' ) {
+        value = 'assets/' + value + '.png'
+        selected.forEach(obj=> {
+          addShadow(obj,value)  
+        })
+      }
       selected.forEach(obj=> {
         obj[property] = value
         additionalProperties.forEach(prop=> {
@@ -2241,7 +2371,7 @@ function duplicateObject(obj) {
       obj.rotationSpeed,
       obj.hasTrail,
       obj.trail
-      )
+    )
 
     if(obj.instanceOf) {
       img.id = obj.instanceOf + Math.floor(Math.random()*1_000_000_000)
@@ -2251,6 +2381,39 @@ function duplicateObject(obj) {
     objectHistory.push(img)
     selectObject('by mouse', img)
   }
+  if(obj instanceof TextObject) {
+    var id = 'text-obj-' + random(0,1_000_000_000)
+    while(objects.filter(obj=>obj.id == id).length > 0) {
+      id = 'text-obj-' + random(0,1_000_000_000)
+    }
+    let textClone = []
+    obj.text.forEach(item=> {
+      textClone.push(item)
+    })
+    let triggerClone = {
+      type: obj.trigger.type,
+      area: obj.trigger.area,
+      active: false,
+    }
+    
+    var textObj = new TextObject(
+      obj.x,
+      obj.y,
+      textClone,
+      obj.ctx,
+      obj.mult,
+      id,
+      obj.font,
+      obj.fontSize,
+      obj.isStatic,
+      obj.hidden,
+      triggerClone
+    )
+    textObjects.push(textObj)
+    objectHistory.push(textObj)
+    selectObject('by mouse', textObj)
+  }
+
 }
 
 function undo() {
@@ -2323,6 +2486,7 @@ function init() {
   }
 
   readObjectData()
+  draw()
 }
 
 function drawDebugInfo(fps,) {
@@ -2395,6 +2559,22 @@ function replaceSrc(target,sourcePath) {
     target.dimY = img.naturalHeight
   }
 }
+function addShadow(target,sourcePath) {
+  let img = new Image()
+  img.src = sourcePath
+  img.onload = ()=> {
+    target.shadow = img
+    target.shadowSrc = img.src
+  }
+}
+
+function showEnding() {
+  let link = document.createElement('a')
+  link.setAttribute('href','../fullpoem/index.html')
+  link.innerText = 'Hyperion - Book I'
+  document.body.append(link)
+}
+
 
 //music system
 
@@ -2419,7 +2599,4 @@ function loadAudio(target,src,section) {
     // event that does something
   }
 }
-
-init()
-draw()
 
