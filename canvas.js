@@ -1,13 +1,16 @@
 let debug = false;
 let controlsVisible = false;
-let graphics = 'medium';
+let graphics;
 let spawnThings = true;
 let userInteracted = false;
 let userReachedEnd = false;
-let firstTimeVisit = true;
+let firstTimeVisit;
+if(localStorage.getItem("firstTimeVisit")) firstTimeVisit = false
+else firstTimeVisit = true
 let audioOn = false;
 let paused = false
 let lastTimestamp = 0;
+let last60Frames = [];
 let isTitleVisible = true;
 let isTitleFading = false;
 
@@ -16,22 +19,28 @@ const PI = Math.PI
 const userUnderstand = {
   movement: false,
   scroll: false,
+  preferredGraphics: null,
+  openGraphics: false,
   hintMovement: null,
   hintScroll: null,
+  hintGraphics: null,
+  hintOpenGraphics: null,
 }
 
 let cameraShakeInterval = null;
 
 let scrollVelocity = 0
 let scrollFriction = 0.08
-let mainTimer = [0,60]
-let movedTimer = [0,60*8]
-let cometSpawnTimer = [0,15]
+let mainTimer = [0,60],
+    movedTimer = [0,60*8],
+    cometSpawnTimer = [0,15]
 let timers = [
   mainTimer,
   movedTimer,
   cometSpawnTimer,
 ]
+let focusedElement
+
 let queryInput = document.querySelector('#query-input')
 let idDisplay = document.querySelector('#selected-object-id')
 //labels
@@ -81,7 +90,7 @@ deleteObjectBtn.addEventListener('click', function() {
 
 let selectedLabel = document.querySelector('#selected-count')
 
-let hintContainer = document.querySelector('#hint-overlay')
+let hintContMain = document.querySelector('#hint-overlay')
 
 
 let objects = []; //all complexi-er objects will be there
@@ -119,9 +128,15 @@ let fgTransMult = 1.5
 let fg2TransMult = 2.2
 let fg3TransMult = 1.08
 
+let canvases = []
 let contexts = []
+let mults = [] // ctx translate multipliers, these are responsible for the parallax effect
+canvases.push(canvasBg,canvasBg2,canvasBg3,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2,canvasFg3)
+canvases.forEach(canvas => {
+  canvas.width = window.innerWidth
+  canvas.height = window.innerHeight
+})
 contexts.push(bctx,b2ctx,b3ctx,mctx,m2ctx,tctx,fctx,f2ctx,f3ctx)
-let mults = []
 mults.push(
   bgTransMult,
   bg2TransMult,
@@ -135,17 +150,8 @@ mults.push(
 )
 
 
-let canvases = []
-canvases.push(canvasBg,canvasBg2,canvasBg3,canvasMg,canvasMg2,canvasText,canvasFg,canvasFg2,canvasFg3)
-canvases.forEach(canvas => {
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight
-})
-
 let cw = window.innerWidth
 let ch = window.innerHeight
-
-
 
 window.onresize = () => {
   let globalTransPrev = globalTranslate
@@ -163,6 +169,7 @@ window.onresize = () => {
     y: globalTransPrev.y,
   })
 }
+
 
 //input related variables
 
@@ -207,9 +214,6 @@ let mainfont;
 let mainFontSize = 22;
 
 
-//horribleness
-let pointerHand = new Image()
-pointerHand.src = 'assets/pointer_hand.png'
 let cursorAlphaDefault = 0.2
 //load content 
 async function loadFonts() {
@@ -239,8 +243,8 @@ function loadImages() {
     img.src = imgSources[imageKeys[i]].src
     img.onload = () => {loadProgress()}
   }
-
 }
+
 function loadProgress() {
   imagesLoaded++
   if(imagesLoaded == imageCount) {
@@ -272,9 +276,19 @@ document.addEventListener('keydown', function (e) {
   }
   if(e.code == bindings.focusQuery) {
     if(document.activeElement !== queryInput) {
+      if(!controlsVisible) showControls()
       setTimeout(()=> {
         queryInput.focus();
         focusedElement = queryInput
+      },25)
+    }
+  }
+  if(e.code == bindings.unfocusQuery) {
+    if(document.activeElement == queryInput) {
+      setTimeout(()=> {
+        queryInput.blur();
+        focusedElement = null
+        showControls()
       },25)
     }
   }
@@ -326,8 +340,16 @@ document.addEventListener('keydown', function (e) {
     }
     if(e.code == bindings.pause) {
       paused = !paused
-      if(paused) cancelAnimationFrame(drawloop)
+      if(paused) {
+        cancelAnimationFrame(drawloop)
+        let hint = new Hint(`Paused`, 'white', 'hsl(240,17%,7%)', 'announcement')
+        hints.push(hint)
+        hint.dismissed = true
+      }
       else draw()
+    }
+    if(e.code == bindings.openGraphicsSettings) {
+      toggleGraphicsSettings()
     }
     if(e.code == bindings.dupe && selected) {
       selected.forEach((obj,index)=> duplicateObject(selected[index]))
@@ -504,6 +526,15 @@ function dismissHint(forWhat) {
     let filtered = hints.filter(hint=> hint.forWhat == 'scroll')
     if(filtered.length > 0) filtered.forEach(hint=> hint.dismissed = true)
   }
+  else
+  if(forWhat == 'graphics') {
+    userUnderstand.preferredGraphics = true
+    localStorage.setItem('userUnderstand preferredGraphics',graphics)
+    clearInterval(userUnderstand.hintGraphics)
+    let filtered = hints.filter(hint=> hint.forWhat == 'graphics')
+    if(filtered.length > 0) filtered.forEach(hint=> hint.dismissed = true)
+    console.log(`dismissed hint 'graphics'`)
+  }
 }
 changelogHandle.addEventListener('mousedown', function(e) {
   mousedown = true
@@ -557,7 +588,8 @@ canvasText.addEventListener('mousedown', function (e) {
     let anchor = textObjects.filter(obj=>obj.trigger.active).shift()
     let newWindow = window.open('fullpoem/index.html','_blank')
     newWindow.onload = ()=> {
-      newWindow.document.querySelector(`#${anchor.trigger.target}`).classList.remove('hidden')
+      // newWindow.document.querySelector(`#${anchor.trigger.target}`).classList.remove('hidden')
+      newWindow.document.querySelector(`#${anchor.trigger.target}`).scrollIntoView()
     }
     return
   }
@@ -629,25 +661,18 @@ function moveCanvas(e, offset) {
   dx *= dragMultiplier
   dy *= dragMultiplier
 
-  //end limiter
-  if(Math.abs(globalTranslate.y) >= 19500 && dy < 0) {
+  //end limiter //drag ceiling
+  if( globalTranslate.y <= -19600 && dy < 0 ) {
     dy = 0
-    if(userReachedEnd == false) {
-      // showEnding()
-      userReachedEnd = true
-    }
+    userReachedEnd = true
+  }
+  if( globalTranslate.y >= 1300 && dy > 0 ) {
+    dy = 0
   }
 
-  bctx.translate(dx * bgTransMult,  dy * bgTransMult)
-  b2ctx.translate(dx * bg2TransMult,  dy * bg2TransMult)
-  b3ctx.translate(dx * bg3TransMult,  dy * bg3TransMult)
-  mctx.translate(dx * mgTransMult,  dy * mgTransMult)
-  m2ctx.translate(dx * mg2TransMult,  dy * mg2TransMult)
-  tctx.translate(dx * tTransMult,   dy * tTransMult)
-  fctx.translate(dx * fgTransMult,  dy * fgTransMult)
-  f2ctx.translate(dx * fg2TransMult,  dy * fg2TransMult)
-  f3ctx.translate(dx * fg3TransMult,  dy * fg3TransMult)
-
+  contexts.forEach((ctx,index) => {
+    ctx.translate(dx * mults[index],dy * mults[index])
+  })
   globalTranslate.x += dx
   globalTranslate.y += dy
 
@@ -668,6 +693,17 @@ function draw(currentTimestamp) {
   var dt = (currentTimestamp - lastTimestamp)/1000
   var fps = 1/dt
   lastTimestamp = currentTimestamp
+
+  //performance testing // this is crude i guess, but it'll do for now
+  // it simply measures whether your FPS is consistently 1+ integer below 60 (i.e. 59-0fps)
+  last60Frames.push(fps)
+  if(last60Frames.length > 60) last60Frames.shift()
+  let sum = 0;
+  last60Frames.forEach(num=>sum += num)
+  if(Math.round(sum/60) < 60) {
+    
+  }
+
 
   timers.forEach(timer=> {
       timer[0]++
@@ -748,18 +784,25 @@ function draw(currentTimestamp) {
     populateBorderCells()
   }
 
+  if(graphics != 'low') 
   particleGens.forEach(gen => {
     gen.update()
   })
+
   particles.forEach(particle=> {
     particle.update()
   })
+
   mouseGlow.update()
 
   localStorage.setItem('globalTranslateX', globalTranslate.x)
   localStorage.setItem('globalTranslateY', globalTranslate.y)
 
-  if(mainTimer[0] == mainTimer[1] && spawnThings) {
+  if(
+    mainTimer[0] == mainTimer[1] && 
+    spawnThings && 
+    graphics != 'low'
+  ) {
     let chance = random(0,100)
     if(chance > 85 && chance <= 96) {
       spawnAsteroid()
@@ -793,8 +836,11 @@ function draw(currentTimestamp) {
   }
 
   // draw
-  drawBg(bctx,bgTransMult, {opacity: 1})
-  drawStars(bctx,bgTransMult)
+  
+  if(graphics != 'low') {
+    drawBg(bctx,bgTransMult, {opacity: 1})
+    drawStars(bctx,bgTransMult)
+  }
 
   
   //nasty code that calculates the visual center for each canvas
@@ -1135,32 +1181,46 @@ function populateCell(cell = null) {
 
 let hints = [];
 class Hint {
-  constructor(text,colorText,colorBg = null,forWhat) {
-    this.text = text
-    this.colorText = colorText
-    this.colorBg = colorBg
-    this.dismissed = false
-    this.forWhat = forWhat
-    this.life = 100
+  constructor(
+    text,
+    colorText,
+    colorBg = null,
+    forWhat,
+    options = { clickAction: undefined, dismissed: false } //clickAction needs to be a function
+  ) {
+    this.text = text;
+    this.colorText = colorText;
+    this.colorBg = colorBg;
 
-    this.element = document.createElement('div'); 
+   
+    this.dismissed = options.dismissed;
+
+    this.forWhat = forWhat;
+    this.life = 100;
+    this.element = document.createElement("div");
+
     let hintCont = this.element;
-    let hint = document.createElement('div')
-    hintCont.classList.add('hint-container','anim-pulse')
-    hint.classList.add('hint')
-    hint.innerHTML = this.text
-    hint.style.color = this.colorText
-    if(this.colorBg) hint.style.backgroundColor = this.colorBg
-    hintCont.append(hint)
-    hintContainer.append(hintCont)
+    let hint = document.createElement("div");
+    hintCont.classList.add("hint-container", "anim-pulse");
+    hint.classList.add("hint");
+    hint.innerHTML = this.text;
+    hint.style.color = this.colorText;
+    if (this.colorBg) hint.style.backgroundColor = this.colorBg;
+    hintCont.append(hint);
+    hintContMain.append(hintCont);
+
+    if (options.clickAction) {
+      hintCont.classList.add('all-pointer-events','cursor-pointer')
+      hintCont.onclick = options.clickAction;
+    }
   }
   update() {
-    if(!this.dismissed) return
-    this.life--
-    this.element.childNodes[0].style.opacity = this.life/100
-    if(this.life <= 0) {
-      this.element.parentElement.removeChild(this.element)
-      hints = hints.filter(hint => hint != this)
+    if (this.dismissed != true) return;
+    this.life--;
+    this.element.childNodes[0].style.opacity = this.life / 100;
+    if (this.life <= 0) {
+      this.element.parentElement.removeChild(this.element);
+      hints = hints.filter((hint) => hint != this);
     }
   }
 }
@@ -1332,7 +1392,8 @@ class Img {
     rotationSpeed = 0,
     hasTrail = false,
     trail = undefined,
-    showBaseImg = true
+    showBaseImg = true,
+    useDarken = true
     ) {
     this.id = id
     this.dimX = dimX
@@ -1379,6 +1440,7 @@ class Img {
     })
     this.animated = animated
     this.filter = filter
+    this.useDarken = useDarken
     this.chainlink = chainlink
     this.isStatic = isStatic
     this.velocity = velocity
@@ -1450,7 +1512,10 @@ class Img {
       }
       this.ctx.globalCompositeOperation = 'source-atop'
     }
-    if(this.comet) {
+    if(this.useDarken == false) {
+      this.ctx.filter = ''
+    }
+    else if(this.comet) {
       this.ctx.filter = ''
     }
     else if(darken > 0) {
@@ -1511,6 +1576,8 @@ class Img {
     if((matchedObject == this && pressedShift) || (selected.filter(obj=> obj.id == this.id).length > 0 && pressedCtrl) ) {
       this.ctx.restore()
     }
+
+    //attempt to fix the anchor rendering for object selection, didn't work...
     // if(debug || pressedShift) {
     //   let topCtx = contexts[contexts.length - 1]
     //   topCtx.save()
@@ -1857,7 +1924,7 @@ class ParticleGenerator {
     spawnRate = 45,
     spawnChance = 0.5, 
     spawnRange = 600, 
-    color = particleProperties.colors[0],
+    colors = [particleProperties.colors[0]],
     lifeMin = particleProperties.lifeMinDefault,
     lifeMax = particleProperties.lifeMaxDefault,
     force = {
@@ -1881,7 +1948,7 @@ class ParticleGenerator {
     this.spawnReady = false // i want to incorporate some randomness and spawn skipping so this will randomly be switched on
     this.spawnRange = spawnRange
     this.spawnChance = spawnChance // ranges from 0.00...1 to 1
-    this.color = color
+    this.colors = colors
     this.lifeMin = lifeMin
     this.lifeMax = lifeMax
     this.force = force
@@ -1905,7 +1972,7 @@ class ParticleGenerator {
         Math.random()*(this.velRange.xMax - this.velRange.xMin) + this.velRange.xMin,
         Math.random()*(this.velRange.yMax - this.velRange.yMin) + this.velRange.yMin,
         undefined,
-        this.color,
+        this.colors[random(0,this.colors.length - 1)],
         Math.random()*(this.lifeMax - this.lifeMin) + this.lifeMin,
         this,
         this.ctx,
@@ -2150,7 +2217,7 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
       if( property == 'x' || property == 'y' || property == 'dimX' || property == 'dimY' || property == 'rotation' || property == 'rotationSpeed' || property == 'maxOpacity'|| property == 'opacity' ) {
         value = +value
         if(isNaN(value)) {
-          alert('Stop inputting rubbish numbers..')
+          alert('Stop inputting non-numbers..')
           return
         }
       }
@@ -2160,7 +2227,7 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
       if( property == 'rotationSpeed' && Math.abs(value) > 0 ) {
         additionalProperties.push({property: 'isStatic', value: false})
       }
-      if( property == 'animated' || property == 'chainlink' || property == 'glowUnderCursor' || property == 'isStatic' ) {
+      if( property == 'animated' || property == 'chainlink' || property == 'glowUnderCursor' || property == 'isStatic' || property == 'useDarken' ) {
         if(value == 'false') value = false
         if(value == 'true') value = true
       }
@@ -2226,10 +2293,22 @@ function selectObject(targetMethod,match, options = {selectMultiple: false}) {
         })
       }
       if( property == 'shadowSrc' ) {
-        value = 'assets/' + value + '.png'
-        selected.forEach(obj=> {
-          addShadow(obj,value)  
-        })
+        if(value == 'auto') {
+          selected.forEach(obj=> {
+            let indexStart = obj.src.search('/')
+            let indexDot = obj.src.search('.png')
+            let src = obj.src.substring(indexStart + 1,indexDot)
+            value = 'assets/' + src + '_shadow' + '.png'
+            addShadow(obj,value)  
+            // console.log(src)
+          })
+        }
+        else {
+          value = 'assets/' + value + '.png'
+          selected.forEach(obj=> {
+            addShadow(obj,value)  
+          })
+        }
       }
       selected.forEach(obj=> {
         obj[property] = value
@@ -2462,16 +2541,28 @@ function shakeCamera(amount,duration) {
 }
 
 function init() {
-  if(controlsVisible) {
-    showControls()
+  if(controlsVisible) showControls()
+  if(firstTimeVisit) {
+    moveCanvas(undefined, {
+      x: 8,
+      y: 1074,
+    });
+    localStorage.setItem("firstTimeVisit","false")
   }
-  moveCanvas(undefined,{
-    x: localStorage.getItem('globalTranslateX'),
-    y: localStorage.getItem('globalTranslateY'),  
-  })
+  else {
+    moveCanvas(undefined, {
+      x: localStorage.getItem("globalTranslateX"),
+      y: localStorage.getItem("globalTranslateY"),
+    });
+  }
   calcVpOffset()
-  initGrid().then(setTimeout(()=>{hideTitleScreen()},1000), console.log('failed to init grid'))
-  
+  initGrid().then(setTimeout(()=>{hideTitleScreen()},1000), console.log(`I don't understand promises but the grid is probably initiated...`))
+  if(localStorage.getItem('userUnderstand preferredGraphics')) {
+    setGraphics(localStorage.getItem('userUnderstand preferredGraphics'))
+  }
+  else {
+    graphics = 'medium'
+  }
   //hints
   if(localStorage.getItem('userUnderstand movement') != 'true') {
     userUnderstand.hintMovement = setInterval(()=> {
@@ -2485,8 +2576,53 @@ function init() {
     },1000 * 9)
   }
 
+  if(localStorage.getItem('userUnderstand preferredGraphics') == null) {
+    userUnderstand.hintGraphics = setInterval(()=> {
+      if(hints.length == 0) hints.push(new Hint(`If you're experiencing low performance, you can change your graphic settings by clicking here.`,'white', undefined, 'graphics',{clickAction: toggleGraphicsSettings}))
+    },1000 * 10)
+  }
+
+  //highlight settings on title screen
+
+
   readObjectData()
   draw()
+}
+
+function toggleGraphicsSettings() {
+  let cont = document.querySelector('#graphics-options-container')
+  cont.classList.toggle('hidden')
+  dismissHint('graphics')
+}
+
+function saveGraphicsSettings() {
+  if(!userUnderstand.openGraphics) {
+    let hint = new Hint(`Settings were saved. You can bring up this menu again by pressing 'G'`, 'white', 'hsl(240,17%,7%)', 'announcement')
+    hints.push(hint)
+    setTimeout(()=> {hint.dismissed = true},4000)
+    userUnderstand.openGraphics = true
+  }
+  toggleGraphicsSettings()
+}
+
+function setGraphics(value) {
+  graphics = value
+  localStorage.setItem('userUnderstand preferredGraphics',graphics)
+
+  let buttons = Array.from(document.querySelectorAll('.option.graphics'))
+  buttons.forEach(btn=> btn.classList.remove('selected'))
+
+  let button = document.querySelector(`#graphics-${value}`)
+  button.classList.add('selected')
+
+  if(graphics == 'low') {
+    document.querySelector('#background-stars').classList.remove('hidden')
+  }
+  else
+  {
+    document.querySelector('#background-stars').classList.add('hidden')
+  }
+  
 }
 
 function drawDebugInfo(fps,) {
@@ -2567,14 +2703,6 @@ function addShadow(target,sourcePath) {
     target.shadowSrc = img.src
   }
 }
-
-function showEnding() {
-  let link = document.createElement('a')
-  link.setAttribute('href','../fullpoem/index.html')
-  link.innerText = 'Hyperion - Book I'
-  document.body.append(link)
-}
-
 
 //music system
 

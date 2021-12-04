@@ -53,7 +53,8 @@ function readObjectData() {
       obj.rotationSpeed,
       obj.hasTrail,
       obj.trail,
-      obj.showBaseImg
+      obj.showBaseImg,
+      obj.useDarken,
     ))
     if(obj.objectType == 'textObject') textObjects.push(new TextObject(
       obj.x,
@@ -80,7 +81,7 @@ function readObjectData() {
       gen.spawnRate,
       gen.spawnChance,
       gen.spawnRange,
-      gen.color,
+      gen.colors,
       gen.lifeMin,
       gen.lifeMax,
       gen.force,

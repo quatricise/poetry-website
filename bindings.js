@@ -6,6 +6,7 @@ let bindings = {
   debug: "Digit1",
   showControls: "Backquote",
   focusQuery: "KeyT",
+  unfocusQuery: "Escape",
   cancel: "KeyC",
   showBindings: "F1",
   save: "KeyS",
@@ -17,4 +18,5 @@ let bindings = {
   resetDimensions: 'KeyR',
   resetAspectRatio: 'KeyU',
   pause: 'KeyP',
+  openGraphicsSettings: 'KeyG',
 };

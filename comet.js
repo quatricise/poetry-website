@@ -89,9 +89,6 @@ function spawnComet() {
   x -= globalTranslate.x * bgTransMult;
   y -= globalTranslate.y * bgTransMult;
 
-  // console.log('x: ' + x)
-  // console.log('y: ' + y)
-
   let vel = {
     x: random(0.4, 2, { round: false, toFixed: 3 }),
     y: random(0.4, 2, { round: false, toFixed: 3 }),

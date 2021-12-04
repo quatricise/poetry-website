@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div class="background hidden" id="background-stars"></div>
   <canvas id="canvas-bg"></canvas>
   <canvas id="canvas-bg3"></canvas>
   <canvas id="canvas-bg2"></canvas>
@@ -52,7 +53,7 @@
       <div class="button hidden" id="delete-object-btn">Delete</div>
     </div>
   </div>
-
+  
   <div class="changelog hidden" id="changelog">
     <div class="header">
       <div class="handle" id="handle">|||</div>
@@ -62,8 +63,33 @@
     </div>
   </div>
   <div class="title-screen">
+    <!-- <h4 class="text">
+      <span class="options">
+        Music:
+        <span class="options-selector">Yes</span>
+        <span class="options-selector">No</span> 
+      </span>
+      <span class="options">
+        Graphics:
+        <span onclick="setGraphics('low')" class="options-selector">Low</span>
+        <span onclick="setGraphics('medium')" class="options-selector">Medium</span> 
+        <span onclick="setGraphics('high')" class="options-selector">High</span> 
+      </span>
+      
+    </h4> -->
   </div>
   <div class="hint-overlay" id="hint-overlay"></div>
+  <div class="graphics-options-container hidden" id="graphics-options-container">
+    <div class="graphics-options">
+      <div onclick="setGraphics('low')" class="nice-button option graphics" id="graphics-low">Low</div>
+      <div class="filler"></div>
+      <div onclick="setGraphics('medium')" class="nice-button option graphics" id="graphics-medium">Medium</div>
+      <div class="filler"></div>
+      <div onclick="setGraphics('high')" class="nice-button option graphics" id="graphics-high">High</div>
+      <div class="vertical-divider"></div>
+      <div onclick="saveGraphicsSettings()" class="nice-button option confirm">Save</div>
+    </div>
+  </div>
   <script src="//cdnjs.cloudflare.com/ajax/libs/gsap/3.8.0/gsap.min.js" integrity="sha512-eP6ippJojIKXKO8EPLtsUMS+/sAGHGo1UN/38swqZa1ypfcD4I0V/ac5G3VzaHfDaklFmQLEs51lhkkVaqg60Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="poem.js"></script>
   <script src="assets.js"></script>

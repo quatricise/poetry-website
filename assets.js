@@ -197,8 +197,11 @@ let imgSources = {
   comet_trail10: {
     src: 'assets/comet_trail10.png'
   },
-  pointer_hand: {
-    src: 'assets/pointer_hand.png'
+  chainlink_s1: {
+    src: 'assets/chainlink_circle_large.png'
+  },
+  chainlink_l1: {
+    src: 'assets/chainlink_circle_small.png'
   }
 }
 
@@ -209,19 +212,22 @@ let particleGenerators = [
     spawnRate: 60,
     spawnChance: 0.4,
     spawnRange: 600,
-    color: 'hsl(250,10%,75%)',
+    colors: ['hsl(250,10%,75%)'],
     lifeMin: 60*6,
     lifeMax: 60*8,
     force: undefined,
     velRange: undefined,
   },
   {
-    parent: 'vale', // by object id from objects inside objects []
+    parent: 'vale1', // by object id from objects inside objects []
     offset: [ 0, -150 ], // offset the center of the generator by x and y
     spawnRate: 50,
     spawnChance: 0.5,
     spawnRange: 400,
-    color: 'hsl(250,10%,75%)',
+    colors: [
+      'hsla(250,10%,50%,0.8)',
+      'hsla(300,15%,50%,0.8)',
+    ],
     lifeMin: 60*6,
     lifeMax: 60*12,
     force: undefined,
@@ -233,7 +239,7 @@ let particleGenerators = [
     spawnRate: 60,
     spawnChance: 0.2,
     spawnRange: 400,
-    color: 'hsla(250,0%,85%,0.5)',
+    colors: ['hsla(250,0%,85%,0.5)'],
     lifeMin: 60*5,
     lifeMax: 60*8,
     force: undefined,
@@ -245,7 +251,7 @@ let particleGenerators = [
     spawnRate: 35,
     spawnChance: 0.2,
     spawnRange: 200,
-    color: 'hsl(0,0%,100%)',
+    colors: ['hsl(0,0%,100%)'],
     lifeMin: 60*4,
     lifeMax: 60*6,
     force: {
@@ -265,7 +271,7 @@ let particleGenerators = [
     spawnRate: 25,
     spawnChance: 0.2,
     spawnRange: 200,
-    color: 'hsla(0,0%,100%,0.5)',
+    colors: ['hsla(0,0%,100%,0.5)'],
     lifeMin: 60*4,
     lifeMax: 60*6,
     force: {
@@ -285,7 +291,7 @@ let particleGenerators = [
     spawnRate: 50,
     spawnChance: 0.2,
     spawnRange: 200,
-    color: 'hsla(0,0%,100%,0.5)',
+    colors: ['hsla(0,0%,100%,0.5)'],
     lifeMin: 60*4,
     lifeMax: 60*6,
     force: {
@@ -299,33 +305,59 @@ let particleGenerators = [
       yMin: -0.5
     },
   },
-  // {
-  //   parent: 's5naiad',
-  //   offset: [0,0],
-  //   spawnRate: 120,
-  //   spawnChance: 0.2,
-  //   spawnRange: 100,
-  //   color: 'hsla(0,0%,100%,0.5)',
-  //   lifeMin: 60*4,
-  //   lifeMax: 60*6,
-  //   force: {
-  //     x: 0.01,
-  //     y: 0.002,
-  //   },
-  //   velRange: {
-  //     xMax: 0.2,
-  //     xMin: -0.1,
-  //     yMax: -0.2,
-  //     yMin: -0.5
-  //   },
-  // },
+  {
+    parent: 's10_pillars',
+    offset: [0,0],
+    spawnRate: 40,
+    spawnChance: 0.4,
+    spawnRange: 600,
+    colors: [
+      'hsla(230,20%,40%,0.8)',
+      'hsla(230,20%,30%,0.6)',
+      'hsla(230,20%,30%,0.4)',
+      'hsla(240,20%,30%,0.5)',
+      'hsla(240,20%,20%,0.5)',
+  ],
+    lifeMin: 60*4,
+    lifeMax: 60*6,
+    force: {
+      x: 0,
+      y: 0,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: 0.2,
+      yMin: -0.2
+    },
+  },
+  {
+    parent: 's5naiad',
+    offset: [0,0],
+    spawnRate: 120,
+    spawnChance: 0.2,
+    spawnRange: 50,
+    colors: ['hsla(0,0%,100%,0.5)'],
+    lifeMin: 60*4,
+    lifeMax: 60*6,
+    force: {
+      x: 0.01,
+      y: 0.002,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.1,
+      yMax: -0.2,
+      yMin: -0.5
+    },
+  },
   {
     parent: 's6sand_fill',
     offset: [-100,300],
-    spawnRate: 20,
+    spawnRate: 70,
     spawnChance: 0.2,
     spawnRange: 150,
-    color: 'hsla(220,15%,50%,0.7)',
+    colors: ['hsla(220,15%,50%,0.7)'],
     lifeMin: 60*4,
     lifeMax: 60*10,
     force: {
@@ -342,10 +374,10 @@ let particleGenerators = [
   {
     parent: 's6sand_fill',
     offset: [50,400],
-    spawnRate: 20,
+    spawnRate: 70,
     spawnChance: 0.2,
     spawnRange: 150,
-    color: 'hsla(225,15%,50%,0.7)',
+    colors: ['hsla(225,15%,50%,0.7)'],
     lifeMin: 60*4,
     lifeMax: 60*10,
     force: {
@@ -362,12 +394,106 @@ let particleGenerators = [
   {
     parent: 's6sand_fill',
     offset: [200,550],
-    spawnRate: 60,
+    spawnRate: 70,
     spawnChance: 0.2,
     spawnRange: 150,
-    color: 'hsla(230,15%,50%,0.7)',
+    colors: ['hsla(230,15%,50%,0.7)'],
     lifeMin: 60*4,
     lifeMax: 60*10,
+    force: {
+      x: 0,
+      y: -0.001,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: 0,
+      yMin: -0.4
+    },
+  },
+  {
+    parent: 's9wheel_anim',
+    offset: [200,-200],
+    spawnRate: 30,
+    spawnChance: 0.8,
+    spawnRange: 200,
+    colors: [
+      'hsla(45,85%,50%,0.7)',
+      'hsla(30,85%,50%,0.8)',
+      'hsla(15,85%,50%,0.8)',
+
+    ],
+    lifeMin: 60*4,
+    lifeMax: 60*10,
+    force: {
+      x: 0,
+      y: 0,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: 0,
+      yMin: -0.4
+    },
+  },
+  {
+    parent: 's8_river',
+    offset: [200,250],
+    spawnRate: 60,
+    spawnChance: 0.2,
+    spawnRange: 80,
+    colors: [
+      'hsla(225,15%,30%,0.6)',
+      'hsla(225,15%,30%,0.2)',
+    ],
+    lifeMin: 60*5,
+    lifeMax: 60*8,
+    force: {
+      x: 0,
+      y: -0.001,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: 0,
+      yMin: -0.4
+    },
+  },
+  {
+    parent: 's8_river',
+    offset: [0,280],
+    spawnRate: 60,
+    spawnChance: 0.2,
+    spawnRange: 80,
+    colors: [
+      'hsla(225,15%,30%,0.7)',
+      'hsla(225,15%,30%,0.5)',
+    ],
+    lifeMin: 60*7,
+    lifeMax: 60*9,
+    force: {
+      x: 0,
+      y: -0.001,
+    },
+    velRange: {
+      xMax: 0.2,
+      xMin: -0.2,
+      yMax: 0,
+      yMin: -0.4
+    },
+  },
+  {
+    parent: 's8_river',
+    offset: [-200,300],
+    spawnRate: 80,
+    spawnChance: 0.2,
+    spawnRange: 50,
+    colors: [
+      'hsla(225,15%,30%,0.4)',
+      'hsla(225,15%,30%,0.6)',
+    ],
+    lifeMin: 60*7,
+    lifeMax: 60*9,
     force: {
       x: 0,
       y: -0.001,

@@ -8,13 +8,29 @@
   src: url(fonts/andada_pro/andada_italic_variable.ttf);
   font-display: swap;
 }
-
+:root {
+  /* cursor: url('assets/cursor_stroke_circle.png'), auto; */
+  --color-dark-purple: hsl(240,17%,7%);
+  --color-dark-purple-hover: rgb(31, 31, 49);
+  --color-purple: rgb(54, 54, 121);
+  --color-purple-hover: rgb(84, 84, 194);
+}
 * {
   box-sizing: border-box;
 }
 body {
   padding: 0;
   margin: 0;
+}
+
+.background {
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+  background-image: url(assets/background_stars.png);
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
 }
 
 canvas {
@@ -116,10 +132,37 @@ canvas {
 .button:hover {
   background-color: coral;
 }
+.nice-button {
+  color: white;
+  background-color: var(--color-dark-purple);
+  padding: 8px 24px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.nice-button:hover {
+  background-color: var(--color-dark-purple-hover);
+}
+
+.option.selected {
+  background-color: var(--color-dark-purple-hover);
+}
+.option.confirm {
+  background-color: var(--color-purple);
+}
+.option.confirm:hover {
+  background-color: var(--color-purple-hover);
+}
 input[type=checkbox] {
   margin-right: 2px;
 }
 
+.vertical-divider {
+  height: 15px;
+  width: auto;
+}
 .changelog {
   width: max-content;
   position: fixed;
@@ -196,14 +239,14 @@ input[type=checkbox] {
   position: fixed;
   width: 100vw;
   height: 100vh;
-  background-color: hsl(240,17%,7%);
+  background-color: var(--color-dark-purple);
   z-index: 3;
   color: white;
   display: flex;
   align-content: center;
   justify-content: center;
   font-family: 'andada';
-  cursor: none;
+  /* cursor: none; */
 }
 .title-screen .text {
   display: flex;
@@ -228,11 +271,49 @@ input[type=checkbox] {
   letter-spacing: 0.02rem;
 
 }
+
+.options-selector {
+  color: rgba(255, 255, 255, 0.5);
+}
+.options-selector:hover {
+  display: inline;
+  font-weight: 700;
+  cursor: pointer;
+  color: white;
+}
 .divider {
   width: 70px;
   height: 2px;
   background-color: white;
   margin: 1.5rem 0;
+}
+
+.all-pointer-events {
+  pointer-events: all!important;
+}
+.cursor-pointer {
+  cursor: pointer!important;
+}
+.graphics-options-container {
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+  z-index: 11;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  font-family: 'andada';
+}
+.graphics-options {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background-color: black;
+  padding: 20px;
+  color: white;
+  pointer-events: all;
+  height: 240px;
 }
 
 .hint-overlay {
@@ -258,7 +339,7 @@ input[type=checkbox] {
   margin-bottom: 15px;
   font-size: 25px;
   font-family: 'andada';
-  /* box-shadow: 0px 0px 10px 2px hsl(240,17%,7%); */
+  /* box-shadow: 0px 0px 10px 2px var(--color-dark-purple) */
 }
 
 .anim-pulse {
@@ -266,12 +347,12 @@ input[type=checkbox] {
 }
 @keyframes pulse {
   0% {
-    filter: brightness(0.4);
+    filter: brightness(0.6);
   }
   50% {
     filter: brightness(1);
   }
   100% {
-    filter: brightness(0.4);
+    filter: brightness(0.6);
   }
 }
